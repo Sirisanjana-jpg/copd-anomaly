@@ -1,0 +1,6 @@
+data/
+outputs/
+*.pt
+*.nii.gz
+__pycache__/
+.venv/
