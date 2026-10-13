@@ -1,0 +1,7 @@
+# Multimodal Fusion Configuration
+fusion_type: "late_gated"           # Options: 'early_concat' or 'late_gated'
+ct_feature_dim: 12                  # 1 global + 5 lobe anomaly + 5 lobe LAA/PRM + 1 heterogeneity
+clin_feature_dim: 8                 # Age, sex, BMI, smoking pack-years, smoking status, indicators
+hidden_dim: 64
+dropout: 0.2
+alpha_init: 0.5                     # Gating weight h = alpha * phi_CT + (1 - alpha) * phi_clin

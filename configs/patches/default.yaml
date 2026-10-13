@@ -1,0 +1,12 @@
+# 3D Patch Extraction Configuration
+size: 50
+per_scan_train: 200
+per_scan_eval: 100
+min_lung_fraction: 0.7
+window_hu: [-1024, 0]
+dtype: "uint8"
+normal_fit_emphysema_cap: 0.01
+shard_size: 1000
+overlap: 0.2
+channels: 1
+seed: 42

@@ -1,6 +1,68 @@
-data/
-outputs/
-*.pt
-*.nii.gz
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 .venv/
+venv/
+ENV/
+env/
+
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+*.key
+*.token
+
+# Testing and linting caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Project data and large artifacts (must not be committed)
+data/
+outputs/real/
+outputs/synthetic/
+!outputs/.gitkeep
+!outputs/real/.gitkeep
+!outputs/synthetic/.gitkeep
+
+# Heavy binaries
+*.pt
+*.pth
+*.onnx
+*.nii
+*.nii.gz
+*.img
+*.hdr
+*.parquet
+*.h5
+*.hdf5
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+# Exacerbation Risk Head Configuration
+head_type: "binary_classification"  # Options: 'binary_classification' or 'cox'
+loss_type: "bce"                    # Options: 'bce' or 'focal'
+focal_gamma: 2.0
+focal_alpha: 0.25
+conformal_alpha: 0.10               # Target 90% coverage
+n_bootstraps: 1000
+random_state: 42

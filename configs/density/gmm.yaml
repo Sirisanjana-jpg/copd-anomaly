@@ -1,0 +1,12 @@
+# Density Estimation Configuration
+model_type: "gmm"                   # Options: 'gmm' or 'flow'
+normal_source: "ctrate_normal"       # Options: 'ctrate_normal', 'loo_pseudonormal', 'self'
+k_grid: [2, 4, 8, 16, 32]
+covariance_type: "full"
+random_state: 42
+normal_fit_emphysema_cap: 0.01
+
+# Flow parameters if model_type == 'flow'
+flow:
+  n_blocks: 4
+  hidden_dim: 64

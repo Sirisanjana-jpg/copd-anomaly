@@ -1,0 +1,11 @@
+# Synthetic 5-Model Ablation Experiment Configuration
+name: "synthetic_ablation"
+n_synthetic_patients: 200
+seed: 42
+train_fraction: 0.6
+val_fraction: 0.2
+test_fraction: 0.2
+conformal_alpha: 0.10
+planted_lobe_effect_size: 1.5
+significance_level: 0.05
+banner: "SYNTHETIC — NOT REAL DATA"

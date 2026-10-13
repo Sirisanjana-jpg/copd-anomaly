@@ -1,0 +1,9 @@
+# DIR-Lab Registration & Lobe PRM Pipeline Configuration
+name: "dirlab_pipeline"
+cases_config: "data/dirlab_cases"
+output_dir: "outputs/real"
+save_montages: true
+save_warped_nifti: true
+prm:
+  fsad_threshold_exp_hu: -856.0
+  emph_threshold_insp_hu: -950.0

@@ -1,0 +1,11 @@
+# Anomaly Score Aggregation Configuration
+method: "top_k_mean"                # Options: 'mean', 'top_k_mean', 'percentile_90', 'max', 'volume_weighted'
+top_k_fraction: 0.1
+percentile: 90
+selection_criterion: "auc"           # Tuned on ctrate_val
+candidates:
+  - "mean"
+  - "top_k_mean"
+  - "percentile_90"
+  - "max"
+  - "volume_weighted"

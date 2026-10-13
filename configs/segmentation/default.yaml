@@ -1,0 +1,6 @@
+# Segmentation Configuration (pluggable backend)
+backend: "threshold" # Options: 'totalsegmentator', 'lungmask', 'threshold'
+threshold_hu: -500.0
+closing_radius: 3
+allow_lobe_fallback: true
+log_licence_notice: true
