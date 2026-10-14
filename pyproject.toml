@@ -83,6 +83,11 @@ known-first-party = ["copd_anomaly"]
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-v --strict-markers"
+env = [
+    "OPENBLAS_NUM_THREADS=1",
+    "OMP_NUM_THREADS=1",
+    "MKL_NUM_THREADS=1",
+]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "synthetic: tests running on synthetic data fixtures",
