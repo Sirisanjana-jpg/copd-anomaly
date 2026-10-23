@@ -10,8 +10,8 @@
 | **M3** | Segmentation, Deformable Registration, TRE & PRM | ✅ Completed | 4 passed (segmenter, deformable reg, TRE, PRM) | **YES (Review Stop 1)** |
 | **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | ✅ Completed | 3 passed (uint8 scaling, patch constraints, sharded dataset) | No |
 | **M5** | CT-RATE Selection & Streaming Pipeline | ✅ Completed | 5 passed (patient ID, zero leakage, tiered splits, normal labels) | No |
-| **M6** | 3D ResNet Contrastive Encoder & NT-Xent | 🔄 In Progress | Pending | No |
-| **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ⏳ Pending | Pending | **YES (Review Stop 2)** |
+| **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ✅ Completed | 4 passed (3D ResNet, dual-channel, NT-Xent, dual-view augmentations) | No |
+| **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | 🔄 In Progress | Pending | **YES (Review Stop 2)** |
 | **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ⏳ Pending | Pending | No |
 | **M9** | Multimodal Extension & Synthetic Cohort Ablations | ⏳ Pending | Pending | No |
 | **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | ⏳ Pending | Pending | **YES (Review Stop 3)** |
