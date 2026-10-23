@@ -144,3 +144,19 @@ def test_save_and_load_nifti(synthetic_dirlab_env):
     # In NIfTI, shape is (X, Y, Z) = (16, 16, 8)
     assert loaded_nii.shape == (dims[0], dims[1], dims[2])
     assert np.isclose(loaded_nii.header.get_zooms(), (1.0, 1.0, 2.5)).all()
+
+
+def test_dirlab_manifest_parquet_if_present():
+    """Verify that if dirlab_manifest.parquet is generated, it contains all 20 scans with verified HU."""
+    manifest_path = Path("data/processed/dirlab_manifest.parquet")
+    if not manifest_path.exists():
+        pytest.skip("Manifest not generated on disk yet.")
+
+    import pandas as pd
+    df = pd.read_parquet(manifest_path)
+    assert len(df) == 20
+    assert "hu_offset_verified" in df.columns
+    assert df["hu_offset_verified"].all()
+    assert set(df["phase"].unique()) == {"insp", "exp"}
+    assert df["patient_id"].nunique() == 10
+

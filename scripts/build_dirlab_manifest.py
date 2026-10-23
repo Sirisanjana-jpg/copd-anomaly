@@ -28,6 +28,7 @@ def build_manifest(
     interim_dir: Path,
     output_nifti_dir: Path,
     manifest_parquet_path: Path,
+    target_cases: list[str] | None = None,
 ) -> pd.DataFrame:
     loader = DIRLabLoader(config_path)
     with open(config_path, encoding="utf-8") as f:
@@ -36,6 +37,8 @@ def build_manifest(
     records = []
 
     for case_id, case_info in sorted(cases_config.items()):
+        if target_cases and case_id not in target_cases:
+            continue
         zip_path = zips_dir / f"{case_id}.zip"
         if not zip_path.exists():
             logger.warning(f"Zip archive not found for {case_id}: {zip_path}. Skipping.")
@@ -125,6 +128,13 @@ def build_manifest(
                 }
             )
 
+            # Clean up extracted raw img to conserve disk space
+            if img_path.exists():
+                try:
+                    img_path.unlink()
+                except Exception as e:
+                    logger.debug(f"Could not remove interim raw file {img_path}: {e}")
+
     if not records:
         raise RuntimeError("No records were successfully generated!")
 
@@ -149,6 +159,7 @@ def main() -> None:
         type=Path,
         default=Path("data/processed/dirlab_manifest.parquet"),
     )
+    parser.add_argument("--cases", nargs="*", default=None, help="Optional subset of cases to process.")
     args = parser.parse_args()
 
     try:
@@ -158,6 +169,7 @@ def main() -> None:
             args.interim_dir,
             args.output_nifti_dir,
             args.manifest_parquet,
+            target_cases=args.cases,
         )
         sys.exit(0)
     except Exception as e:
