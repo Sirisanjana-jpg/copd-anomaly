@@ -7,8 +7,8 @@
 | **M0** | Plan Artifact & Architectural Blueprint | ✅ Completed | N/A (Plan Approved) | Completed |
 | **M1** | Project Scaffold, Dependencies & CI Pipeline | ✅ Completed | 7 passed (scaffold, interfaces, helpers, secrets) | No |
 | **M2** | DIR-Lab Ingestion, Auditing & Parquet Manifest | ✅ Completed | 6 passed (ingestion, HU offset, base detection, manifest) | No |
-| **M3** | Segmentation, Deformable Registration, TRE & PRM | 🔄 In Progress | Pending | **YES (Review Stop 1)** |
-| **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | ⏳ Pending | Pending | No |
+| **M3** | Segmentation, Deformable Registration, TRE & PRM | ✅ Completed | 4 passed (segmenter, deformable reg, TRE, PRM) | **YES (Review Stop 1)** |
+| **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | 🔄 In Progress | Pending | No |
 | **M5** | CT-RATE Selection & Streaming Pipeline | ⏳ Pending | Pending | No |
 | **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ⏳ Pending | Pending | No |
 | **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ⏳ Pending | Pending | **YES (Review Stop 2)** |
