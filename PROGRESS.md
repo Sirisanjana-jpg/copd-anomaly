@@ -11,8 +11,8 @@
 | **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | ✅ Completed | 3 passed (uint8 scaling, patch constraints, sharded dataset) | No |
 | **M5** | CT-RATE Selection & Streaming Pipeline | ✅ Completed | 5 passed (patient ID, zero leakage, tiered splits, normal labels) | No |
 | **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ✅ Completed | 4 passed (3D ResNet, dual-channel, NT-Xent, dual-view augmentations) | No |
-| **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | 🔄 In Progress | Pending | **YES (Review Stop 2)** |
-| **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ⏳ Pending | Pending | No |
+| **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ✅ Completed | 4 passed (GMM, RealNVP flow, aggregators, proxy AUROC) | **YES (Review Stop 2)** |
+| **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | 🔄 In Progress | Pending | No |
 | **M9** | Multimodal Extension & Synthetic Cohort Ablations | ⏳ Pending | Pending | No |
 | **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | ⏳ Pending | Pending | **YES (Review Stop 3)** |
 
@@ -32,10 +32,10 @@
 - [x] **V9 (U4)**: DIR-Lab copd1-copd10 HU Offset: Verified across all 20 scans with median lung HU strictly $\in [-950, -750]$ HU.
 - [x] **V10 (U5/U7)**: CT-RATE Patient ID parsing, zero-leakage disjoint splitting (`ctrate_train`, `ctrate_val`, `ctrate_test`), and canonical `_a_1.nii.gz` suffix preference verified.
 - [x] **V11 (U6)**: CT-RATE Voxel Intensity Rescaling: Window [-1024, 0] HU to [0, 255] uint8 and [0, 1] float32 verified.
+- [x] **V12 (U9)**: Density Modeling & Normalizing Flow: GMM density estimator and RealNVP normalizing flow implemented and verified with anomaly scoring $s(x) = -\log p(z)$.
 
 ### Unverified Items & Runtime Verification Plan
 - [ ] **U8: Lobe Segmentation Backend & License**: Handled by dynamic probe with fallback to classical threshold mask and loud alert disabling lobe features if unavailable.
-- [ ] **U9: Normalizing Flow Backend**: Handled by importing `nflows`/`FrEIA` or seamlessly falling back to internal RealNVP module.
 
 ---
 
