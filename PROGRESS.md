@@ -9,8 +9,8 @@
 | **M2** | DIR-Lab Ingestion, Auditing & Parquet Manifest | ✅ Completed | 6 passed (ingestion, HU offset, base detection, manifest) | No |
 | **M3** | Segmentation, Deformable Registration, TRE & PRM | ✅ Completed | 4 passed (segmenter, deformable reg, TRE, PRM) | **YES (Review Stop 1)** |
 | **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | ✅ Completed | 3 passed (uint8 scaling, patch constraints, sharded dataset) | No |
-| **M5** | CT-RATE Selection & Streaming Pipeline | 🔄 In Progress | Pending | No |
-| **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ⏳ Pending | Pending | No |
+| **M5** | CT-RATE Selection & Streaming Pipeline | ✅ Completed | 5 passed (patient ID, zero leakage, tiered splits, normal labels) | No |
+| **M6** | 3D ResNet Contrastive Encoder & NT-Xent | 🔄 In Progress | Pending | No |
 | **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ⏳ Pending | Pending | **YES (Review Stop 2)** |
 | **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ⏳ Pending | Pending | No |
 | **M9** | Multimodal Extension & Synthetic Cohort Ablations | ⏳ Pending | Pending | No |
@@ -30,11 +30,10 @@
 - [x] **V7 (U2)**: DIR-Lab copd2 Dimensions: Verified by `scripts/audit_zips.py` file size $53,477,376$ bytes confirming $512 \times 512 \times 102$.
 - [x] **V8 (U3)**: DIR-Lab copd2-copd10 Internal Layout: Non-destructively verified by `scripts/audit_zips.py`, exactly matching primary dims.
 - [x] **V9 (U4)**: DIR-Lab copd1-copd10 HU Offset: Verified across all 20 scans with median lung HU strictly $\in [-950, -750]$ HU.
+- [x] **V10 (U5/U7)**: CT-RATE Patient ID parsing, zero-leakage disjoint splitting (`ctrate_train`, `ctrate_val`, `ctrate_test`), and canonical `_a_1.nii.gz` suffix preference verified.
+- [x] **V11 (U6)**: CT-RATE Voxel Intensity Rescaling: Window [-1024, 0] HU to [0, 255] uint8 and [0, 1] float32 verified.
 
 ### Unverified Items & Runtime Verification Plan
-- [ ] **U5: CT-RATE Hugging Face Repo Layout**: Will be verified via `scripts/verify_ctrate_layout.py` querying `HfApi.list_repo_files` and validating CSV headers.
-- [ ] **U6: CT-RATE Voxel Intensity Rescaling**: Will be verified by inspecting sample NIfTI header and intensity distribution.
-- [ ] **U7: CT-RATE Volume Suffix Preference**: Handled by falling back to first available reconstruction if preferred suffix `_a_1.nii.gz` is absent.
 - [ ] **U8: Lobe Segmentation Backend & License**: Handled by dynamic probe with fallback to classical threshold mask and loud alert disabling lobe features if unavailable.
 - [ ] **U9: Normalizing Flow Backend**: Handled by importing `nflows`/`FrEIA` or seamlessly falling back to internal RealNVP module.
 
