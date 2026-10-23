@@ -24,9 +24,7 @@ logger = get_logger("density_model")
 
 
 class GaussianMixtureDensity(DensityModel):
-    """
-    Gaussian Mixture Model density estimator.
-    """
+    """Gaussian Mixture Model density estimator."""
 
     def __init__(
         self,
@@ -43,7 +41,7 @@ class GaussianMixtureDensity(DensityModel):
         if isinstance(z_normal, torch.Tensor):
             z_normal = z_normal.detach().cpu().numpy()
 
-        n_samples, n_dim = z_normal.shape
+        n_samples, _ = z_normal.shape
         n_comp = min(self.n_components, max(1, n_samples // 5))
 
         logger.info(
@@ -146,15 +144,12 @@ class RealNVPFlow(nn.Module):
             z, log_det = layer(z)
             log_det_sum += log_det
 
-        # Standard Gaussian prior log likelihood
         log_prior = -0.5 * (np.log(2.0 * np.pi) * self.dim + (z**2).sum(dim=-1))
         return log_prior + log_det_sum
 
 
 class RealNVPFlowDensity(DensityModel):
-    """
-    Normalizing Flow density estimator wrapping RealNVPFlow.
-    """
+    """Normalizing Flow density estimator wrapping RealNVPFlow."""
 
     def __init__(
         self,
@@ -185,10 +180,8 @@ class RealNVPFlowDensity(DensityModel):
         batch_size = min(64, n_samples)
         logger.info(f"Fitting RealNVP flow on {n_samples} embeddings (dim={self.dim})...")
 
-        for epoch in range(self.epochs):
+        for _ in range(self.epochs):
             perm = torch.randperm(n_samples)
-            total_loss = 0.0
-            n_batches = 0
             for i in range(0, n_samples, batch_size):
                 batch = z_tensor[perm[i : i + batch_size]]
                 loss = -self.flow.log_prob(batch).mean()
@@ -196,9 +189,6 @@ class RealNVPFlowDensity(DensityModel):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
-                total_loss += loss.item()
-                n_batches += 1
 
     def log_prob(self, z: np.ndarray | torch.Tensor) -> np.ndarray:
         if self.flow is None:
@@ -215,18 +205,15 @@ class RealNVPFlowDensity(DensityModel):
 
 
 class PatchAnomalyScorer(AnomalyScorer):
-    """
-    Computes patch anomaly scores s(x) = -log p(f(x)).
-    """
+    """Computes patch anomaly scores s(x) = -log p(f(x))."""
 
     def __init__(self, density_model: DensityModel) -> None:
         self.density_model = density_model
 
     def score_patches(self, z: np.ndarray | torch.Tensor) -> np.ndarray:
-        """
-        Computes negative log-likelihood anomaly score.
-        Higher score = more anomalous.
-        """
+        """Computes negative log-likelihood anomaly score. Higher score = more anomalous."""
         log_p = self.density_model.log_prob(z)
         scores = -log_p
         return scores.astype(np.float32)
+
+

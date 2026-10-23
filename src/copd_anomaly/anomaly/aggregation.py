@@ -8,15 +8,14 @@ scan-level anomaly severity index S(X).
 from __future__ import annotations
 
 from typing import Literal
+
 import numpy as np
 
 from copd_anomaly.interfaces import Aggregator
 
 
 class ScoreAggregator(Aggregator):
-    """
-    Unified patch score aggregator supporting multiple pooling functions.
-    """
+    """Unified patch score aggregator supporting multiple pooling functions."""
 
     def __init__(
         self,
@@ -48,24 +47,19 @@ class ScoreAggregator(Aggregator):
 
         if self.method == "mean":
             return float(np.mean(patch_scores))
-
-        elif self.method == "p90":
+        if self.method == "p90":
             return float(np.percentile(patch_scores, 90))
-
-        elif self.method == "p95":
+        if self.method == "p95":
             return float(np.percentile(patch_scores, 95))
-
-        elif self.method == "top_k":
+        if self.method == "top_k":
             k = min(self.top_k, len(patch_scores))
             top_k_vals = np.partition(patch_scores, -k)[-k:]
             return float(np.mean(top_k_vals))
-
-        elif self.method == "weighted":
+        if self.method == "weighted":
             if volume_weights is not None and np.sum(volume_weights) > 0:
                 return float(np.average(patch_scores, weights=volume_weights))
             return float(np.mean(patch_scores))
-
-        elif self.method == "lobe_max":
+        if self.method == "lobe_max":
             if lobe_ids is not None and np.any(lobe_ids > 0):
                 lobe_means = []
                 for lobe_id in range(1, 6):
@@ -76,17 +70,14 @@ class ScoreAggregator(Aggregator):
                     return float(np.max(lobe_means))
             return float(np.mean(patch_scores))
 
-        else:
-            return float(np.mean(patch_scores))
+        return float(np.mean(patch_scores))
 
 
 def extract_patient_anomaly_summary(
     patch_scores: np.ndarray,
     lobe_ids: np.ndarray | None = None,
 ) -> dict[str, float]:
-    """
-    Extracts multi-faceted patient-level anomaly score metrics.
-    """
+    """Extracts multi-faceted patient-level anomaly score metrics."""
     if len(patch_scores) == 0:
         return {}
 
@@ -108,7 +99,12 @@ def extract_patient_anomaly_summary(
                 summary[f"{name}_anomaly_mean"] = val
                 lobe_means[name] = val
 
-        if "rul" in lobe_means and "lul" in lobe_means and "rll" in lobe_means and "lll" in lobe_means:
+        if (
+            "rul" in lobe_means
+            and "lul" in lobe_means
+            and "rll" in lobe_means
+            and "lll" in lobe_means
+        ):
             upper_mean = (lobe_means["rul"] + lobe_means["lul"]) / 2.0
             lower_mean = (lobe_means["rll"] + lobe_means["lll"]) / 2.0
             summary["anomaly_upper_lower_ratio"] = float(upper_mean / (lower_mean + 1e-6))
@@ -117,3 +113,4 @@ def extract_patient_anomaly_summary(
             summary["anomaly_heterogeneity_index"] = float(np.std(list(lobe_means.values())))
 
     return summary
+

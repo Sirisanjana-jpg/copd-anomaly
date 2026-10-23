@@ -27,12 +27,7 @@ def audit_dirlab_archives(
     zips_dir: Path,
     config_path: Path,
 ) -> dict:
-    """
-    Audits all zip files in zips_dir according to dirlab_cases.yaml.
-
-    Returns:
-        Audit report dictionary.
-    """
+    """Audits all zip files in zips_dir according to dirlab_cases.yaml."""
     if not zips_dir.is_dir():
         raise FileNotFoundError(f"Zips directory does not exist: {zips_dir}")
 
@@ -57,7 +52,8 @@ def audit_dirlab_archives(
 
         if not case_meta:
             logger.warning(
-                f"Case '{case_name}' not defined in {config_path.name}! Proceeding with generic audit."
+                f"Case '{case_name}' not defined in {config_path.name}! "
+                "Proceeding with generic audit."
             )
 
         case_report = {
@@ -85,26 +81,22 @@ def audit_dirlab_archives(
                     }
                 )
 
-                # Check for junk
                 if "__MACOSX" in filename or filename.endswith(".DS_Store"):
                     case_report["junk_files"].append(filename)
                     continue
 
                 clean_name = Path(filename).name
 
-                # Check for raw images (.img)
                 if clean_name.endswith(".img"):
                     case_report["raw_images"][clean_name] = info.file_size
                     total_raw_image_bytes += info.file_size
 
-                # Check for landmark txt
                 if clean_name.endswith(".txt") and "xyz" in clean_name.lower():
                     case_report["landmarks"].append(clean_name)
 
-        # Validate raw image sizes
         if case_meta:
-            expected_dims = case_meta.get("dims")  # [X, Y, Z]
-            dims_alt = case_meta.get("dims_alt")  # e.g. copd2
+            expected_dims = case_meta.get("dims")
+            dims_alt = case_meta.get("dims_alt")
 
             def calc_expected_bytes(dims: list[int]) -> int:
                 return 2 * dims[0] * dims[1] * dims[2]
@@ -112,7 +104,6 @@ def audit_dirlab_archives(
             expected_bytes = calc_expected_bytes(expected_dims) if expected_dims else None
             alt_bytes = calc_expected_bytes(dims_alt) if dims_alt else None
 
-            # Verify inhale and exhale images
             for img_name, img_size in case_report["raw_images"].items():
                 if img_size == expected_bytes:
                     case_report["dimension_match"] = {
@@ -142,7 +133,6 @@ def audit_dirlab_archives(
                     case_report["errors"].append(err_msg)
                     logger.error(f"  [FAIL] {err_msg}")
 
-            # Check expected files presence
             expected_img_prefixes = [f"{case_name}_iBHCT", f"{case_name}_eBHCT"]
             found_img_names = [Path(k).name for k in case_report["raw_images"].keys()]
             for prefix in expected_img_prefixes:
@@ -155,8 +145,9 @@ def audit_dirlab_archives(
 
     summary = {
         "cases_audited": len(audit_results),
-        "total_archives_size_mb": sum(r["archive_size_bytes"] for r in audit_results.values())
-        / (1024 * 1024),
+        "total_archives_size_mb": (
+            sum(r["archive_size_bytes"] for r in audit_results.values()) / (1024 * 1024)
+        ),
         "total_uncompressed_mb": total_uncompressed_bytes / (1024 * 1024),
         "total_raw_image_mb": total_raw_image_bytes / (1024 * 1024),
         "cases": audit_results,
@@ -199,10 +190,11 @@ def main() -> None:
         if total_errors > 0:
             sys.exit(1)
         sys.exit(0)
-    except Exception as e:
-        logger.error(f"Audit failed with exception: {e}")
+    except Exception as exc:
+        logger.error(f"Audit failed with exception: {exc}")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+

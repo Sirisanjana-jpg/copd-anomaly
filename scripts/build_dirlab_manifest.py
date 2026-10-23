@@ -10,6 +10,7 @@ Creates:
 from __future__ import annotations
 
 import argparse
+import gc
 import sys
 from pathlib import Path
 
@@ -49,7 +50,7 @@ def build_manifest(
         extracted = loader.extract_case(zip_path, case_interim)
 
         dims_xyz = case_info["dims"]
-        spacing_xyz = case_info["spacing_mm"]  # [sx, sy, sz]
+        spacing_xyz = case_info["spacing_mm"]
         spacing_zyx = (spacing_xyz[2], spacing_xyz[1], spacing_xyz[0])
 
         for phase in ["insp", "exp"]:
@@ -61,7 +62,6 @@ def build_manifest(
                 continue
 
             img_path = extracted[img_key]
-            # Check for alternate dims (e.g. copd2)
             actual_size = img_path.stat().st_size
             primary_size = 2 * dims_xyz[0] * dims_xyz[1] * dims_xyz[2]
             target_dims = dims_xyz
@@ -73,24 +73,18 @@ def build_manifest(
                     target_dims = alt_dims
                     logger.info(f"Using alternate dims {alt_dims} for {case_id}")
 
-            # Read and convert to HU
             vol_hu = loader.read_raw_volume(img_path, target_dims)
             shape_zyx = vol_hu.shape
 
-            # Verify HU offset
             is_valid_hu, median_hu = loader.verify_hu_offset(vol_hu)
-            logger.info(
-                f"  {case_id}_{phase} median lung HU: {median_hu:.1f} (valid: {is_valid_hu})"
-            )
+            logger.info(f"  {case_id}_{phase} median lung HU: {median_hu:.1f} (valid: {is_valid_hu})")
 
-            # Save NIfTI if not already present
             nifti_path = output_nifti_dir / f"{case_id}_{phase}.nii.gz"
             if not nifti_path.exists() or nifti_path.stat().st_size == 0:
                 loader.save_nifti(vol_hu, spacing_zyx, nifti_path)
             else:
                 logger.info(f"  NIfTI already exists: {nifti_path.name}")
 
-            # Landmarks handling
             lm_path = extracted.get(lm_key)
             base_idx = None
             in_lung_frac = None
@@ -100,7 +94,6 @@ def build_manifest(
                 del lung_mask
 
             del vol_hu
-            import gc
             gc.collect()
 
             records.append(
@@ -122,18 +115,17 @@ def build_manifest(
                     "lung_median_hu": float(median_hu),
                     "landmarks_path": str(lm_path) if lm_path else None,
                     "landmark_index_base": int(base_idx) if base_idx is not None else None,
-                    "landmark_in_lung_frac": float(in_lung_frac)
-                    if in_lung_frac is not None
-                    else None,
+                    "landmark_in_lung_frac": (
+                        float(in_lung_frac) if in_lung_frac is not None else None
+                    ),
                 }
             )
 
-            # Clean up extracted raw img to conserve disk space
             if img_path.exists():
                 try:
                     img_path.unlink()
-                except Exception as e:
-                    logger.debug(f"Could not remove interim raw file {img_path}: {e}")
+                except Exception as exc:
+                    logger.debug(f"Could not remove interim raw file {img_path}: {exc}")
 
     if not records:
         raise RuntimeError("No records were successfully generated!")
@@ -172,10 +164,11 @@ def main() -> None:
             target_cases=args.cases,
         )
         sys.exit(0)
-    except Exception as e:
-        logger.error(f"Failed to build manifest: {e}", exc_info=True)
+    except Exception as exc:
+        logger.error(f"Failed to build manifest: {exc}", exc_info=True)
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+

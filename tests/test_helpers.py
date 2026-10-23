@@ -28,8 +28,8 @@ def test_set_seed_determinism():
 def test_compute_config_hash():
     """Verify that config hashing produces deterministic digests."""
     cfg1 = {"model": "resnet18", "lr": 0.001, "layers": [1, 2, 3]}
-    cfg2 = {"layers": [1, 2, 3], "lr": 0.001, "model": "resnet18"}  # Permuted keys
-    cfg3 = {"model": "resnet18", "lr": 0.002, "layers": [1, 2, 3]}  # Changed value
+    cfg2 = {"layers": [1, 2, 3], "lr": 0.001, "model": "resnet18"}
+    cfg3 = {"model": "resnet18", "lr": 0.002, "layers": [1, 2, 3]}
 
     hash1 = compute_config_hash(cfg1)
     hash2 = compute_config_hash(cfg2)
@@ -46,3 +46,4 @@ def test_get_logger():
     logger = get_logger("test_logger")
     assert logger.name == "test_logger"
     assert len(logger.handlers) >= 1
+

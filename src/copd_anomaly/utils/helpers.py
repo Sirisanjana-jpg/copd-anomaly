@@ -15,12 +15,7 @@ import torch
 
 
 def set_seed(seed: int = 42) -> None:
-    """
-    Sets random seeds across random, numpy, and torch for reproducible runs.
-
-    Args:
-        seed: Integer random seed.
-    """
+    """Sets random seeds across random, numpy, and torch for reproducible runs."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -31,16 +26,7 @@ def set_seed(seed: int = 42) -> None:
 
 
 def get_logger(name: str = "copd_anomaly", level: int = logging.INFO) -> logging.Logger:
-    """
-    Configures and returns a structured logger.
-
-    Args:
-        name: Logger name.
-        level: Logging level (e.g. logging.INFO).
-
-    Returns:
-        Configured logging.Logger.
-    """
+    """Configures and returns a structured logger."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
@@ -55,15 +41,7 @@ def get_logger(name: str = "copd_anomaly", level: int = logging.INFO) -> logging
 
 
 def compute_config_hash(cfg: dict[str, Any] | Any) -> str:
-    """
-    Computes a deterministic SHA256 hex digest from a dictionary configuration.
-
-    Args:
-        cfg: Configuration dictionary or serializable object.
-
-    Returns:
-        Hexadecimal hash string (first 16 characters).
-    """
+    """Computes a deterministic SHA256 hex digest from a dictionary configuration."""
     if hasattr(cfg, "__dict__"):
         cfg_dict = cfg.__dict__
     elif isinstance(cfg, dict):
@@ -73,3 +51,4 @@ def compute_config_hash(cfg: dict[str, Any] | Any) -> str:
 
     serialized = json.dumps(cfg_dict, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
+

@@ -40,7 +40,6 @@ def test_interface_dataclasses():
     assert metadata.patient_id == "copd1"
     assert metadata.spacing_zyx == (2.5, 0.625, 0.625)
 
-    # PatchRecord instantiation
     record = PatchRecord(
         patch_id="copd1_insp_001",
         patient_id="copd1",
@@ -54,7 +53,6 @@ def test_interface_dataclasses():
     assert record.lung_fraction >= 0.7
     assert record.lobe_id == 1
 
-    # RegistrationResult instantiation with dummy shapes
     dummy_warped = np.zeros((10, 10, 10), dtype=np.float32)
     reg_result = RegistrationResult(
         warped_volume=dummy_warped,
@@ -78,7 +76,6 @@ def test_base_encoder_subclass():
             self.fc_proj = torch.nn.Linear(128, 64)
 
         def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-            # x shape: (B, C, 50, 50, 50)
             b = x.shape[0]
             pooled = self.backbone(x).view(b, -1)
             z_emb = self.fc_emb(pooled)
@@ -119,7 +116,6 @@ def test_no_secrets_in_tracked_files():
                     f"Potential Hugging Face secret detected in {file_path.relative_to(repo_root)}!"
                 )
 
-    # Also check root-level files
     for root_file in repo_root.glob("*.*"):
         if root_file.name in {".env.example", ".env.txt"}:
             continue
@@ -127,3 +123,4 @@ def test_no_secrets_in_tracked_files():
             content = root_file.read_text(encoding="utf-8", errors="ignore")
             matches = hf_token_regex.findall(content)
             assert len(matches) == 0, f"Potential Hugging Face secret detected in {root_file.name}!"
+
