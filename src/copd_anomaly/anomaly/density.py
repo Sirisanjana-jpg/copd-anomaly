@@ -10,11 +10,12 @@ Implements:
 from __future__ import annotations
 
 from typing import Literal
+
 import joblib
 import numpy as np
-from sklearn.mixture import GaussianMixture
 import torch
 import torch.nn as nn
+from sklearn.mixture import GaussianMixture
 
 from copd_anomaly.interfaces import AnomalyScorer, DensityModel
 from copd_anomaly.utils.helpers import get_logger
@@ -45,7 +46,10 @@ class GaussianMixtureDensity(DensityModel):
         n_samples, n_dim = z_normal.shape
         n_comp = min(self.n_components, max(1, n_samples // 5))
 
-        logger.info(f"Fitting GMM density model (K={n_comp}, cov={self.covariance_type}) on {n_samples} normal patches...")
+        logger.info(
+            "Fitting GMM density model "
+            f"(K={n_comp}, cov={self.covariance_type}) on {n_samples} normal patches..."
+        )
         self.gmm = GaussianMixture(
             n_components=n_comp,
             covariance_type=self.covariance_type,
@@ -63,7 +67,16 @@ class GaussianMixtureDensity(DensityModel):
         return self.gmm.score_samples(z)
 
     def save(self, path: str) -> None:
-        joblib.dump({"gmm": self.gmm, "params": {"n_components": self.n_components, "covariance_type": self.covariance_type}}, path)
+        joblib.dump(
+            {
+                "gmm": self.gmm,
+                "params": {
+                    "n_components": self.n_components,
+                    "covariance_type": self.covariance_type,
+                },
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: str) -> GaussianMixtureDensity:
@@ -143,7 +156,13 @@ class RealNVPFlowDensity(DensityModel):
     Normalizing Flow density estimator wrapping RealNVPFlow.
     """
 
-    def __init__(self, dim: int = 128, n_layers: int = 4, epochs: int = 50, lr: float = 1e-3) -> None:
+    def __init__(
+        self,
+        dim: int = 128,
+        n_layers: int = 4,
+        epochs: int = 50,
+        lr: float = 1e-3,
+    ) -> None:
         self.dim = dim
         self.n_layers = n_layers
         self.epochs = epochs
