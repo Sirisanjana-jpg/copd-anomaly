@@ -12,8 +12,8 @@
 | **M5** | CT-RATE Selection & Streaming Pipeline | ✅ Completed | 5 passed (patient ID, zero leakage, tiered splits, normal labels) | No |
 | **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ✅ Completed | 4 passed (3D ResNet, dual-channel, NT-Xent, dual-view augmentations) | No |
 | **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ✅ Completed | 4 passed (GMM, RealNVP flow, aggregators, proxy AUROC) | **YES (Review Stop 2)** |
-| **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | 🔄 In Progress | Pending | No |
-| **M9** | Multimodal Extension & Synthetic Cohort Ablations | ⏳ Pending | Pending | No |
+| **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ✅ Completed | 6 passed (segmenter, reg, TRE, PRM, lobe builder, heatmaps) | No |
+| **M9** | Multimodal Extension & Synthetic Cohort Ablations | 🔄 In Progress | Pending | No |
 | **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | ⏳ Pending | Pending | **YES (Review Stop 3)** |
 
 ---

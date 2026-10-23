@@ -148,3 +148,66 @@ def test_prm_mapping_and_statistics(synthetic_pair_phantom):
     assert "laa950_insp_pct" in stats
     assert stats["prm_emph_pct"] > 0
     assert stats["laa950_insp_pct"] > 0
+
+
+def test_lobe_feature_builder():
+    """Verify LobeFeatureBuilder calculates spatial gradients and PRM integration."""
+    from copd_anomaly.features.lobe_builder import LobeFeatureBuilder
+    from copd_anomaly.interfaces import PatchRecord
+
+    builder = LobeFeatureBuilder()
+    scores = np.array([10.0, 12.0, 20.0, 22.0, 15.0], dtype=np.float32)
+    # 5 patches in 5 lobes: 1: RUL, 2: RML, 3: RLL, 4: LUL, 5: LLL
+    records = [
+        PatchRecord(
+            patch_id=f"p_{i}",
+            patient_id="case_1",
+            scan_id="case_1_insp",
+            center_zyx=(10, 20, 20),
+            lobe_id=i + 1,
+            lung_fraction=0.85,
+            volume_weight=1.0,
+            laa950_fraction=0.05,
+        )
+        for i in range(5)
+    ]
+
+    prm_dummy = {"norm_pct": 70.0, "fsad_pct": 20.0, "emph_pct": 10.0}
+    feats = builder.build_features(scores, records, prm_dummy)
+
+    assert "global_anomaly_mean" in feats
+    assert "rul_anomaly_mean" in feats
+    assert "upper_lower_ratio" in feats
+    assert "left_right_asymmetry" in feats
+    assert "heterogeneity_index" in feats
+    assert feats["prm_norm_pct"] == 70.0
+
+
+def test_reconstruct_anomaly_volume():
+    """Verify 3D anomaly heatmap volume reconstruction from patch scores."""
+    from copd_anomaly.interfaces import PatchRecord
+    from copd_anomaly.viz.heatmaps import reconstruct_anomaly_volume
+
+    shape = (20, 20, 20)
+    records = [
+        PatchRecord(
+            patch_id="p_0",
+            patient_id="c1",
+            scan_id="s1",
+            center_zyx=(10, 10, 10),
+            lobe_id=1,
+            lung_fraction=1.0,
+            volume_weight=1.0,
+            laa950_fraction=0.0,
+        )
+    ]
+    scores = np.array([25.0], dtype=np.float32)
+
+    vol = reconstruct_anomaly_volume(shape, records, scores, patch_size=6)
+    assert vol.shape == shape
+    assert vol.dtype == np.float32
+    # Center voxel should have received score 25.0
+    assert np.isclose(vol[10, 10, 10], 25.0)
+    # Far corner voxel should be 0.0
+    assert vol[0, 0, 0] == 0.0
+
