@@ -13,8 +13,8 @@
 | **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ✅ Completed | 4 passed (3D ResNet, dual-channel, NT-Xent, dual-view augmentations) | No |
 | **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ✅ Completed | 4 passed (GMM, RealNVP flow, aggregators, proxy AUROC) | **YES (Review Stop 2)** |
 | **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ✅ Completed | 6 passed (segmenter, reg, TRE, PRM, lobe builder, heatmaps) | No |
-| **M9** | Multimodal Extension & Synthetic Cohort Ablations | 🔄 In Progress | Pending | No |
-| **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | ⏳ Pending | Pending | **YES (Review Stop 3)** |
+| **M9** | Multimodal Extension & Synthetic Cohort Ablations | ✅ Completed | 4 passed (synthetic cohort, fusion network, MC uncertainty, 5-arm ablation) | No |
+| **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | 🔄 In Progress | Pending | **YES (Review Stop 3)** |
 
 ---
 
