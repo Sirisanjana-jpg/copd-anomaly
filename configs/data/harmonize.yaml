@@ -1,0 +1,5 @@
+# Harmonization Configuration (ours, tunable)
+spacing_mm: 1.0
+lung_median_hu_insp_expected: [-950, -750]
+window_hu: [-1024, 0]
+dtype: "uint8"

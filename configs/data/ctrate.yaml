@@ -1,0 +1,38 @@
+# CT-RATE Dataset Configuration (gated Hugging Face dataset)
+repo_id: "ibrahimhamamci/CT-RATE"
+labels_csv: "dataset/multi_abnormality_labels/train_predicted_labels.csv"
+valid_labels_csv: "dataset/multi_abnormality_labels/valid_predicted_labels.csv"
+volume_path_pattern: "dataset/{split}/{patient_id}/{scan_id}/{volume_name}"
+
+selection:
+  seed: 0
+  suffix_preference: "_a_1.nii.gz"       # one reconstruction per patient; verify exists, else first available
+  prefer_slice_thickness_mm: [1.5, 3.0] # soft preference if metadata supports it (UNVERIFIED column)
+  tiers:
+    smoke:    {train: 30,  val: 10, test: 10}
+    lean:     {train: 100, val: 30, test: 70}
+    standard: {train: 240, val: 60, test: 100}
+  mix:
+    train: {normal: 0.5, emphysema: 0.25, mosaic: 0.25}
+    val:   {normal: 0.5, emphysema: 0.5}
+    test:  {normal: 0.5, emphysema: 0.5}
+  active_tier: lean
+
+normal_definition:
+  zero:
+    - emphysema
+    - mosaic_attenuation_pattern
+    - lung_opacity
+    - consolidation
+    - atelectasis
+    - pulmonary_fibrotic_sequela
+    - bronchiectasis
+
+label_column_map:
+  emphysema: "Emphysema"
+  mosaic_attenuation_pattern: "Mosaic attenuation pattern"
+  lung_opacity: "Lung opacity"
+  consolidation: "Consolidation"
+  atelectasis: "Atelectasis"
+  pulmonary_fibrotic_sequela: "Pulmonary fibrotic sequela"
+  bronchiectasis: "Bronchiectasis"

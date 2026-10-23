@@ -1,0 +1,26 @@
+# configs/data/dirlab_cases.yaml  — per-case metadata (source: Emory DIR-Lab COPDgene page)
+# dims = [X(cols), Y(rows), Z(slices)]; numpy reshape order is (Z, Y, X); dtype little-endian int16.
+# HU = stored - 1000 (verified on copd1 only; reader must auto-check, see notes). Padding value = -2000.
+# displacement_mm = [mean, sd] initial landmark misalignment (inhale vs exhale) = TRE with NO registration.
+# observer_mm = [mean, sd] human landmark-repeat error (noise floor for TRE).
+# best_published_mm = [mean, sd] lowest published TRE; null = already at observer noise floor.
+defaults:
+  dtype: "<i2"
+  hu_offset: 1000
+  padding_value: -2000
+  slice_thickness_mm: 2.5
+  landmarks_per_phase: 300
+  landmark_axis_order: [x_col, y_row, z_slice]   # verified on copd1: 100% inside lung vs 71% if x/y swapped
+  landmark_index_base: 1                          # DIR-Lab convention (UNVERIFIED: test 0 vs 1 base, <1 voxel diff)
+  resample_spacing_mm: 1.0                        # isotropic target for patching (tunable)
+cases:
+  copd1:  {dims: [512,512,121], spacing_mm: [0.625,0.625,2.5], displacement_mm: [25.90,11.57], observer_mm: [0.65,0.73], best_published_mm: [0.71,0.81]}
+  copd2:  {dims: [512,512,102], spacing_mm: [0.645,0.645,2.5], displacement_mm: [21.77,6.46],  observer_mm: [1.06,1.51], best_published_mm: [1.46,2.28], dims_alt: [256,256,112]}
+  copd3:  {dims: [512,512,126], spacing_mm: [0.652,0.652,2.5], displacement_mm: [12.29,6.39],  observer_mm: [0.58,0.87], best_published_mm: [0.77,0.77]}
+  copd4:  {dims: [512,512,126], spacing_mm: [0.590,0.590,2.5], displacement_mm: [30.90,13.49], observer_mm: [0.71,0.96], best_published_mm: null}
+  copd5:  {dims: [512,512,131], spacing_mm: [0.647,0.647,2.5], displacement_mm: [30.90,14.05], observer_mm: [0.65,0.87], best_published_mm: [0.71,0.83]}
+  copd6:  {dims: [512,512,119], spacing_mm: [0.633,0.633,2.5], displacement_mm: [28.32,9.20],  observer_mm: [1.06,2.38], best_published_mm: null}
+  copd7:  {dims: [512,512,112], spacing_mm: [0.625,0.625,2.5], displacement_mm: [21.66,7.66],  observer_mm: [0.65,0.78], best_published_mm: [0.74,1.06]}
+  copd8:  {dims: [512,512,115], spacing_mm: [0.586,0.586,2.5], displacement_mm: [25.57,13.61], observer_mm: [0.96,3.07], best_published_mm: null}
+  copd9:  {dims: [512,512,116], spacing_mm: [0.664,0.664,2.5], displacement_mm: [14.84,10.01], observer_mm: [1.01,2.54], best_published_mm: null}
+  copd10: {dims: [512,512,135], spacing_mm: [0.742,0.742,2.5], displacement_mm: [22.48,10.64], observer_mm: [0.87,1.65], best_published_mm: null}

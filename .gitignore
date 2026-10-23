@@ -42,7 +42,7 @@ htmlcov/
 .mypy_cache/
 
 # Project data and large artifacts (must not be committed)
-data/
+/data/
 outputs/real/
 outputs/synthetic/
 !outputs/.gitkeep
