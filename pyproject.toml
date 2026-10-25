@@ -7,7 +7,7 @@ name = "copd-anomaly"
 version = "0.1.0"
 description = "Reproduction and lobe-wise exacerbation extension of cOOpD anomaly-based CT quantification for COPD (Almeida et al., 2024)"
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10,<3.13"
 license = { text = "TODO: To be determined pending CT-RATE (CC-BY-NC-SA) and DIR-Lab data redistribution review" }
 authors = [
     { name = "COPD Anomaly Research Team" }
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "numpy>=1.24.0,<3.0.0",
