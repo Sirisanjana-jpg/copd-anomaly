@@ -297,10 +297,10 @@ def stream_ctrate(
                 )
         logger.info("Split %s complete: %d patch records.", split_name, split_summary[split_name])
 
-    if split_summary.get("train", 0) == 0:
-        raise RuntimeError(
-            "No training patches were produced. Check the access token, CT-RATE file names, "
-            "segmentation output, and patch-size/lung-fraction settings."
+    no_training_patches = split_summary.get("train", 0) == 0
+    if no_training_patches:
+        logger.error(
+            "No training patches were produced; writing diagnostics before returning failure."
         )
     summary_path = output_dir / "patch_counts.json"
     summary_tmp = summary_path.with_name(f".{summary_path.name}.tmp")
@@ -335,6 +335,11 @@ def stream_ctrate(
             run_summary_path,
         )
     logger.info("Streaming diagnostics saved to %s", run_summary_path)
+    if no_training_patches:
+        raise RuntimeError(
+            f"No training patches were produced. Inspect {run_summary_path} and train/stream_log.csv; "
+            "check access, remote file names, segmentation output, and patch sampler thresholds."
+        )
     return split_summary
 
 
