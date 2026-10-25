@@ -19,10 +19,10 @@ def test_extract_patient_id_uses_split_prefix() -> None:
 
 def test_create_tiered_splits_is_patient_disjoint() -> None:
     train = pd.DataFrame(
-        {"VolumeName": [f"train_{idx:05d}_a_1.nii.gz" for idx in range(100)]}
+        {"VolumeName": [f"train_{idx:05d}_a_1.nii.gz" for idx in range(130)]}
     )
     valid = pd.DataFrame(
-        {"VolumeName": [f"valid_{idx:05d}_a_1.nii.gz" for idx in range(100, 200)]}
+        {"VolumeName": [f"valid_{idx:05d}_a_1.nii.gz" for idx in range(130, 200)]}
     )
     splits = create_tiered_splits(train, valid, tier="lean", seed=42)
     patients = {
