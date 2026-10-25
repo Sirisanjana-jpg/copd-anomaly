@@ -40,9 +40,13 @@ def train_contrastive_encoder(
         raise ValueError("epochs must be >= 1 and batch_size must be >= 2 for NT-Xent.")
     path_parts = {part.lower() for part in checkpoint_dir.parts}
     if dry_run and "real" in path_parts:
-        raise ValueError("Synthetic dry-run checkpoints cannot be written under a real output directory.")
+        raise ValueError(
+            "Synthetic dry-run checkpoints cannot be written under a real output directory."
+        )
     if not dry_run and "synthetic" in path_parts:
-        raise ValueError("Real training checkpoints cannot be written under a synthetic output directory.")
+        raise ValueError(
+            "Real training checkpoints cannot be written under a synthetic output directory."
+        )
     if not dry_run:
         if shards_dir is None:
             raise ValueError(
