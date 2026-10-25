@@ -26,8 +26,7 @@ logger = get_logger("stream_ctrate")
 def _attach_stream_file_log(log_path: Path) -> None:
     resolved_path = str(log_path.resolve())
     if any(
-        isinstance(handler, logging.FileHandler)
-        and handler.baseFilename == resolved_path
+        isinstance(handler, logging.FileHandler) and handler.baseFilename == resolved_path
         for handler in logger.handlers
     ):
         return
@@ -86,11 +85,7 @@ def _load_resume_writer(
                     f"Unreferenced shard files found under {output_dir}: {sorted(orphan_shards)[:10]}. "
                     "A prior write may have been interrupted; inspect or rebuild this split."
                 )
-            missing_shards = [
-                name
-                for name in manifest_shards
-                if not (output_dir / name).is_file()
-            ]
+            missing_shards = [name for name in manifest_shards if not (output_dir / name).is_file()]
             if missing_shards:
                 raise FileNotFoundError(
                     f"Manifest references missing shard files under {output_dir}: {missing_shards[:5]}"
@@ -204,11 +199,10 @@ def stream_ctrate(
             previous_selection = pd.read_csv(selected_path)
             current_selection = split_frame.reset_index(drop=True)
             selection_columns = ["VolumeName", "patient_id", "split"]
-            if (
-                not set(selection_columns).issubset(previous_selection.columns)
-                or not previous_selection[selection_columns]
-                .astype(str)
-                .equals(current_selection[selection_columns].astype(str))
+            if not set(selection_columns).issubset(
+                previous_selection.columns
+            ) or not previous_selection[selection_columns].astype(str).equals(
+                current_selection[selection_columns].astype(str)
             ):
                 raise ValueError(
                     f"Selected cohort for {split_name} differs from the saved selection. "
