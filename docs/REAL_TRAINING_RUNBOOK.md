@@ -103,10 +103,24 @@ python scripts/fit_density.py --shards-dir data/processed/ctrate_lean/train --en
 
 Check `outputs/real/checkpoints/density_fit.log` and how many patches pass the LAA-950 filter before interpreting the result. If too few eligible patches remain, do not silently loosen the threshold; document a scientifically justified selection rule and rerun with a fresh, versioned output.
 
-## 6. Current pipeline boundary
+## 6. Real inference and held-out report-label proxy evaluation
 
-Real patient-level scoring and held-out proxy evaluation are **not implemented end-to-end yet**. The scoring script intentionally fails rather than writing an empty or fabricated real report. Successful encoder training and density fitting alone are not evidence of diagnostic performance. Next work is to implement real patch inference, patient-level aggregation, held-out report-label proxy evaluation, and validated lobe mapping.
+After a real encoder and GMM density model have been trained/fitted, score the held-out test shards (do not score training shards for the final reported metrics):
 
-CT-RATE report labels are proxy labels, not confirmed COPD diagnoses or clinical outcomes. DIR-Lab can support registration/landmark and imaging-method checks, but it does not provide the clinical 12-month exacerbation outcomes required to validate an exacerbation-risk model. Clinical COPD classification or exacerbation prediction requires a real clinical cohort with appropriate labels/outcomes.
+```bash
+python scripts/score_anomaly.py --real-inference --shards-dir data/processed/ctrate_lean/test --encoder-ckpt outputs/real/checkpoints/encoder_best.pt --density-model outputs/real/checkpoints/density_model.joblib --output-dir outputs/real/reports --device auto
+```
+
+This writes patch-, scan-, and patient-level scores with the split and provenance marked. It does not assign report labels, diagnose COPD, or predict exacerbations. The density model must have real-training provenance; legacy/synthetic density artifacts are rejected.
+
+To evaluate a CT-RATE report-label proxy, first create and review a separate label table from the approved report metadata using a documented, versioned rule. Required columns are `patient_id,label` and optionally `split`; label must be binary 0/1. Do not use the test scores to choose the label rule, score threshold, or model. The label file must refer to exactly the patients in the held-out score file.
+
+```bash
+python scripts/evaluate_proxy.py --patient-scores outputs/real/reports/patient_anomaly_scores.csv --labels data/processed/ctrate_test_report_labels.csv --output outputs/real/reports/report_label_proxy_metrics.json --label-definition "REPLACE_WITH_REVIEWED_RULE_AND_VERSION" --score-column anomaly_mean --expected-split test
+```
+
+The evaluator rejects training/validation scores, duplicate patients, nonbinary labels, mismatched patient IDs, and unverified score provenance. Output is explicitly labelled `CT_RATE_REPORT_LABEL_PROXY_NOT_CLINICAL_DIAGNOSIS`. It is a report-derived proxy benchmark only.
+
+CT-RATE report labels are not confirmed COPD diagnoses or clinical outcomes. DIR-Lab can support registration/landmark and imaging-method checks, but it does not provide the clinical 12-month exacerbation outcomes required to validate an exacerbation-risk model. Clinical COPD classification or exacerbation prediction requires an appropriate real clinical cohort and outcomes.
 
 Do not upload gated CT data or model artifacts to a public repository without checking dataset terms.
