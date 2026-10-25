@@ -33,9 +33,13 @@ def score_and_evaluate(
         raise ValueError("n_bootstraps must be >= 1.")
     output_parts = {part.lower() for part in output_report_path.parts}
     if dry_run and "real" in output_parts:
-        raise ValueError("Synthetic evaluation reports cannot be written under a real output directory.")
+        raise ValueError(
+            "Synthetic evaluation reports cannot be written under a real output directory."
+        )
     if not dry_run and "synthetic" in output_parts:
-        raise ValueError("Real evaluation reports cannot be written under a synthetic output directory.")
+        raise ValueError(
+            "Real evaluation reports cannot be written under a synthetic output directory."
+        )
     if dry_run:
         if output_report_path == Path("reports/proxy_auc_report.csv"):
             output_report_path = Path("outputs/synthetic/reports/proxy_auc_report.csv")
