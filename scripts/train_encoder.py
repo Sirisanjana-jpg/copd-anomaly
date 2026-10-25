@@ -77,6 +77,7 @@ def train_contrastive_encoder(
     seed: int = 42,
     resume_from: Path | None = None,
     checkpoint_every_steps: int = 25,
+    require_cuda: bool = False,
 ) -> Path:
     if epochs < 1 or batch_size < 2:
         raise ValueError("epochs must be >= 1 and batch_size must be >= 2 for NT-Xent.")
@@ -124,6 +125,11 @@ def train_contrastive_encoder(
             raise RuntimeError("CUDA was requested but is not available.")
     else:
         device_obj = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if require_cuda and device_obj.type != "cuda":
+        raise RuntimeError(
+            "CUDA is required for this run, but the selected device is "
+            f"{device_obj}. Check the GPU driver and PyTorch CUDA installation."
+        )
     logger.info("Training 3D contrastive encoder on device: %s", device_obj)
 
     dataset = None
@@ -521,6 +527,11 @@ def main() -> None:
         help="Save a resumable checkpoint every N training batches (default: 25).",
     )
     parser.add_argument(
+        "--require-cuda",
+        action="store_true",
+        help="Fail instead of silently training on CPU when CUDA is unavailable.",
+    )
+    parser.add_argument(
         "--resume-from", type=Path, default=None, help="Resume real training from encoder_latest.pt"
     )
     parser.add_argument(
@@ -540,6 +551,7 @@ def main() -> None:
             seed=args.seed,
             resume_from=args.resume_from,
             checkpoint_every_steps=args.checkpoint_every_steps,
+            require_cuda=args.require_cuda,
         )
     except Exception:
         logger.exception("Encoder training terminated with an error.")
