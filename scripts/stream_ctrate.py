@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import traceback
 from pathlib import Path
@@ -20,6 +21,24 @@ from copd_anomaly.patches.dataset import ShardedPatchWriter
 from copd_anomaly.utils.helpers import get_logger
 
 logger = get_logger("stream_ctrate")
+
+
+def _attach_stream_file_log(log_path: Path) -> None:
+    resolved_path = str(log_path.resolve())
+    if any(
+        isinstance(handler, logging.FileHandler)
+        and handler.baseFilename == resolved_path
+        for handler in logger.handlers
+    ):
+        return
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
 
 
 def _load_resume_writer(
@@ -140,6 +159,7 @@ def stream_ctrate(
 
     splits = create_tiered_splits(train_metadata, valid_metadata, tier=tier, seed=seed)
     output_dir.mkdir(parents=True, exist_ok=True)
+    _attach_stream_file_log(output_dir / "streaming.log")
     split_summary: dict[str, int] = {}
     scan_status_summary: dict[str, dict[str, int]] = {}
     failed_volumes: list[dict[str, str]] = []
