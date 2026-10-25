@@ -84,7 +84,7 @@ def stream_ctrate(
     resume: bool = True,
 ) -> dict[str, int]:
     if not (os.environ.get("HF_TOKEN") or os.environ.get("HF_READ")):
-        raise EnvironmentError(
+        raise OSError(
             "CT-RATE access token not found. Set HF_TOKEN (recommended) or HF_READ in your environment; "
             "never paste the token into source code or commit it."
         )
