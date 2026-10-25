@@ -1,50 +1,57 @@
 # COPD-Anomaly: Project Progress & Verification Tracker
 
-## Milestone Overview
+## Current status (reviewed 2026-10-25)
 
-| Milestone | Description | Status | Tests Passed | Review Stop |
-|---|---|---|---|---|
-| **M0** | Plan Artifact & Architectural Blueprint | ✅ Completed | N/A (Plan Approved) | Completed |
-| **M1** | Project Scaffold, Dependencies & CI Pipeline | ✅ Completed | 7 passed (scaffold, interfaces, helpers, secrets) | No |
-| **M2** | DIR-Lab Ingestion, Auditing & Parquet Manifest | ✅ Completed | 6 passed (ingestion, HU offset, base detection, manifest) | No |
-| **M3** | Segmentation, Deformable Registration, TRE & PRM | ✅ Completed | 4 passed (segmenter, deformable reg, TRE, PRM) | **YES (Review Stop 1)** |
-| **M4** | 3D Patch Sampling & Uint8 Sharded Datasets | ✅ Completed | 3 passed (uint8 scaling, patch constraints, sharded dataset) | No |
-| **M5** | CT-RATE Selection & Streaming Pipeline | ✅ Completed | 5 passed (patient ID, zero leakage, tiered splits, normal labels) | No |
-| **M6** | 3D ResNet Contrastive Encoder & NT-Xent | ✅ Completed | 4 passed (3D ResNet, dual-channel, NT-Xent, dual-view augmentations) | No |
-| **M7** | Density Estimation, Anomaly Scoring & Proxy AUC | ✅ Completed | 4 passed (GMM, RealNVP flow, aggregators, proxy AUROC) | **YES (Review Stop 2)** |
-| **M8** | DIR-Lab Lobe-Wise Quantitative Analysis | ✅ Completed | 6 passed (segmenter, reg, TRE, PRM, lobe builder, heatmaps) | No |
-| **M9** | Multimodal Extension & Synthetic Cohort Ablations | ✅ Completed | 4 passed (synthetic cohort, fusion network, MC uncertainty, 5-arm ablation) | No |
-| **M10** | Comprehensive Documentation, Notebooks & GitHub Ready | 🔄 In Progress | Pending | **YES (Review Stop 3)** |
+**Research status: not yet ready for scientific evaluation.** The repository has modular components, but the prior milestone table overstated completion: several tests are synthetic unit tests, and some end-to-end paths were not connected to real CT-derived scores. Do not interpret prior "completed" labels as evidence of a validated end-to-end clinical pipeline.
 
----
+| Area | Status | Evidence / next gate |
+|---|---|---|
+| Repository scaffold and dependency metadata | Implemented; CI not yet clean | Re-run Ruff and pytest on the remediation branch |
+| DIR-Lab ingestion / coordinate geometry | Partially implemented; real runtime verification pending | Audit all 10 pairs, geometry, HU conversion and landmark conventions |
+| Lung and five-lobe segmentation | **Unverified / not publication-ready** | Validate backend output and all five labels; reject binary-only masks for lobe analysis |
+| Registration and TRE | Synthetic unit test exists; DIR-Lab results unverified | Correct transform direction, confirm coordinate units, run all available landmarks and report per-case TRE |
+| Patch extraction | Implemented but lobe assignment not connected | Check nonempty manifest, patch counts, real HU values, patient-level splits, masks and lobe IDs |
+| Encoder training | Training loop implemented; no real training verified here | Train from real shards; save logs, config, seed, epoch loss and best checkpoint |
+| Density fitting | Implementation present; depends on a real trained encoder and eligible real patches | Fit only on defined normal training patches; report counts and cohort selection |
+| Real anomaly inference / proxy evaluation | **Not implemented end-to-end** | Must connect real patches → encoder embeddings → density scores → patient aggregation → held-out report labels |
+| Lobe feature analysis | Previously fabricated lobe IDs/scores; real path now fails closed | Connect validated lobe masks and real patch scores before generating real feature tables |
+| Synthetic multimodal / exacerbation ablations | Synthetic software tests only | Never present as clinical evidence; requires a real labelled cohort for clinical claims |
+| Publication readiness | **Blocked** | Clean CI, reproducible real-data pipeline, cohort-level leakage checks, validated registration/segmentation and held-out evaluation |
 
-## Verification Log (Verified vs. Unverified)
+## Provenance rules
 
-### Verified Items
-- [x] **V1**: Workspace path and local OS verified: Windows 11, PowerShell, local Python 3.11.8.
-- [x] **V2**: `data/raw_zips/` verified: all 10 DIR-Lab archives (`copd1.zip` through `copd10.zip`) exist on local disk.
-- [x] **V3**: Ground rules codified in `.agent/rules/project.md` and committed.
-- [x] **V4**: Security guard configured: pre-commit secret regex rejects `hf_[A-Za-z0-9]{20,}` patterns.
-- [x] **V5**: Architecture, formal protocols, and tensor shapes approved in M0 Master Plan.
-- [x] **V6 (U1)**: DIR-Lab Landmark Index Base (0 vs 1): Verified at runtime by `dirlab_loader.py` by computing in-lung landmark percentage for both coordinate bases; logs result and enforces $\ge 90\%$ containment. Base 0 selected for all cases with >90% lung containment.
-- [x] **V7 (U2)**: DIR-Lab copd2 Dimensions: Verified by `scripts/audit_zips.py` file size $53,477,376$ bytes confirming $512 \times 512 \times 102$.
-- [x] **V8 (U3)**: DIR-Lab copd2-copd10 Internal Layout: Non-destructively verified by `scripts/audit_zips.py`, exactly matching primary dims.
-- [x] **V9 (U4)**: DIR-Lab copd1-copd10 HU Offset: Verified across all 20 scans with median lung HU strictly $\in [-950, -750]$ HU.
-- [x] **V10 (U5/U7)**: CT-RATE Patient ID parsing, zero-leakage disjoint splitting (`ctrate_train`, `ctrate_val`, `ctrate_test`), and canonical `_a_1.nii.gz` suffix preference verified.
-- [x] **V11 (U6)**: CT-RATE Voxel Intensity Rescaling: Window [-1024, 0] HU to [0, 255] uint8 and [0, 1] float32 verified.
-- [x] **V12 (U9)**: Density Modeling & Normalizing Flow: GMM density estimator and RealNVP normalizing flow implemented and verified with anomaly scoring $s(x) = -\log p(z)$.
+- Synthetic dry-run artefacts belong under `outputs/synthetic/` and must be labelled synthetic in their filenames or contents.
+- Real outputs belong under `outputs/real/` and must be generated only from verified real inputs.
+- A missing manifest, checkpoint, segmentation, or evaluation input is an error—not permission to generate random data silently.
+- Synthetic AUROC, synthetic exacerbation outcomes, and synthetic lobe scores are not clinical evidence and must not appear in an abstract as results.
+- DIR-Lab supports registration/landmark and imaging-method checks; it does not provide the clinical exacerbation outcome table needed to validate 12-month exacerbation prediction.
+- CT-RATE report labels are proxy labels, not confirmed COPD diagnosis or clinical outcomes.
 
-### Unverified Items & Runtime Verification Plan
-- [ ] **U8: Lobe Segmentation Backend & License**: Handled by dynamic probe with fallback to classical threshold mask and loud alert disabling lobe features if unavailable.
+## Immediate execution order
 
----
+1. Run CI on this branch and fix actual test/lint failures.
+2. Audit DIR-Lab NIfTI geometry, HU conversion, segmentation and registration direction.
+3. Generate and QC real patch shards; ensure patient-level split integrity and document selection.
+4. Train encoder on real patches; save reproducible config and loss history. Training may take 1–2 days depending on GPU, data volume and patch count.
+5. Fit density model only from eligible training-set embeddings.
+6. Implement real patch scoring and patient-level aggregation; evaluate report-label proxy only on a held-out set and label it correctly.
+7. Connect validated lobe labels to patch scores; test missing-lobe handling and per-lobe coverage.
+8. Keep clinical/exacerbation modeling blocked until a real cohort with outcome labels is available.
 
-## Open Questions Log
+## Verification log
 
-1. **Target Python Version**: Local workspace is Python 3.11.8. Pinning `>=3.10,<3.12` in `pyproject.toml` ensures compatibility across Colab/Kaggle.
-2. **Hugging Face Shards Repo**: User input pending for `HF_SHARDS_REPO` (e.g. `username/ctrate-patch-shards`).
-3. **Local GPU**: Assumed local CPU-only; GPU jobs scheduled for Kaggle/Colab.
-4. **Software License Choice**: Tracked as `LICENSE` TODO pending CT-RATE (CC-BY-NC-SA) and DIR-Lab redistribution review.
-5. **Other 9 DIR-Lab Zips Consistency**: Pending execution of `scripts/audit_zips.py` in M2.
-6. **CT-RATE Remote Metadata & Columns**: Handled dynamically at runtime in M5.
-7. **Lobe Segmentation Backend**: Dynamic fallback implemented in M3.
+### Verified from repository inspection
+- Source files and tests are present in the GitHub repository.
+- The earlier CI run failed Ruff (58 findings); pytest did not run in that job. This is not a passing CI result.
+- The previous `score_anomaly.py` real-model branch returned an empty DataFrame rather than performing real patient scoring.
+- The previous `lobe_analysis.py` generated random scores and fabricated lobe IDs regardless of the supplied manifest.
+- The previous encoder and density scripts silently switched to synthetic data when manifests were missing.
+- `make_patches.py` passes `lobe_mask=None`, so real lobe assignment is not connected in that path.
+
+### Not verified in this review
+- No local execution of the full test suite was available through the GitHub connector.
+- No training was run here, and no new encoder/density checkpoint was validated.
+- No real CT volumes, masks, landmarks, or patch shards were processed during this review.
+- No real-data metrics or clinical performance claims have been established.
+
+Update this file only when a result is reproducibly verified; include command, dataset split, relevant counts, and CI run/commit.
