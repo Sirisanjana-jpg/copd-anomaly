@@ -32,7 +32,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: One-time cleanup on remediation branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'remediation/phase0-safety-ci'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'remediation/phase0-safety-ci'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
