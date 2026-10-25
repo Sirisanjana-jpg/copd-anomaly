@@ -78,6 +78,8 @@ def run_ablation_experiments(
     seed: int = 42,
 ) -> pd.DataFrame:
     logger.info(SYNTHETIC_BANNER)
+    if "real" in {part.lower() for part in output_report.parts}:
+        raise ValueError("Synthetic ablation reports cannot be written under a real output directory.")
     output_report.parent.mkdir(parents=True, exist_ok=True)
 
     if not cohort_path.exists():
