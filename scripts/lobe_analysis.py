@@ -27,6 +27,11 @@ def run_lobe_analysis(
     output_csv: Path = Path("reports/dirlab_lobe_features.csv"),
     dry_run: bool = False,
 ) -> pd.DataFrame:
+    output_parts = {part.lower() for part in output_csv.parts}
+    if dry_run and "real" in output_parts:
+        raise ValueError("Synthetic lobe reports cannot be written under a real output directory.")
+    if not dry_run and "synthetic" in output_parts:
+        raise ValueError("Real lobe reports cannot be written under a synthetic output directory.")
     if not dry_run:
         if not manifest_path.is_file():
             raise FileNotFoundError(
