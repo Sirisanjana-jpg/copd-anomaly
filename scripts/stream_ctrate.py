@@ -141,6 +141,8 @@ def stream_ctrate(
     splits = create_tiered_splits(train_metadata, valid_metadata, tier=tier, seed=seed)
     output_dir.mkdir(parents=True, exist_ok=True)
     split_summary: dict[str, int] = {}
+    scan_status_summary: dict[str, dict[str, int]] = {}
+    failed_volumes: list[dict[str, str]] = []
     streamer = CTRATEStreamer(
         repo_id=repo_id,
         temp_dir=temp_dir,
@@ -274,6 +276,25 @@ def stream_ctrate(
             split_summary[split_name] = int(len(frame))
         else:
             split_summary[split_name] = 0
+        if log_path.is_file():
+            final_log = pd.read_csv(log_path)
+            if "status" in final_log.columns:
+                scan_status_summary[split_name] = {
+                    str(status): int(count)
+                    for status, count in final_log["status"].value_counts(dropna=False).items()
+                }
+            if {"volume_name", "status", "error"}.issubset(final_log.columns):
+                failed_rows = final_log[final_log["status"] == "failed"]
+                failed_volumes.extend(
+                    [
+                        {
+                            "split": split_name,
+                            "volume_name": str(row["volume_name"]),
+                            "error": str(row["error"]),
+                        }
+                        for _, row in failed_rows.iterrows()
+                    ]
+                )
         logger.info("Split %s complete: %d patch records.", split_name, split_summary[split_name])
 
     if split_summary.get("train", 0) == 0:
@@ -289,6 +310,31 @@ def stream_ctrate(
         os.replace(summary_tmp, summary_path)
     finally:
         summary_tmp.unlink(missing_ok=True)
+    run_summary = {
+        "patch_counts": split_summary,
+        "scan_status_counts": scan_status_summary,
+        "failed_volume_count": len(failed_volumes),
+        "failed_volumes": failed_volumes,
+        "note": (
+            "Review failed_volumes and stream_log.csv before training. "
+            "A nonzero training patch count does not mean every scan succeeded."
+        ),
+    }
+    run_summary_path = output_dir / "stream_summary.json"
+    run_summary_tmp = run_summary_path.with_name(f".{run_summary_path.name}.tmp")
+    try:
+        run_summary_tmp.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+        json.loads(run_summary_tmp.read_text(encoding="utf-8"))
+        os.replace(run_summary_tmp, run_summary_path)
+    finally:
+        run_summary_tmp.unlink(missing_ok=True)
+    if failed_volumes:
+        logger.warning(
+            "%d CT-RATE volume(s) failed. Inspect %s and each split's stream_log.csv.",
+            len(failed_volumes),
+            run_summary_path,
+        )
+    logger.info("Streaming diagnostics saved to %s", run_summary_path)
     return split_summary
 
 
