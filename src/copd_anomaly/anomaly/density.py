@@ -92,7 +92,7 @@ class GaussianMixtureDensity(DensityModel):
             )
             check = joblib.load(temporary)
             if check.get("gmm") is None or not hasattr(check["gmm"], "means_"):
-                raise IOError(f"Density model verification failed for {destination}.")
+                raise OSError(f"Density model verification failed for {destination}.")
             os.replace(temporary, destination)
         finally:
             temporary.unlink(missing_ok=True)
