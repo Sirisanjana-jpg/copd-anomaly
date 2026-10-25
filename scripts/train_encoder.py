@@ -76,6 +76,7 @@ def train_contrastive_encoder(
     device: str = "auto",
     seed: int = 42,
     resume_from: Path | None = None,
+    checkpoint_every_steps: int = 25,
 ) -> Path:
     if epochs < 1 or batch_size < 2:
         raise ValueError("epochs must be >= 1 and batch_size must be >= 2 for NT-Xent.")
@@ -83,6 +84,10 @@ def train_contrastive_encoder(
         raise ValueError(f"lr must be finite and positive, got {lr}.")
     if temperature <= 0 or not torch.isfinite(torch.tensor(temperature)):
         raise ValueError(f"temperature must be finite and positive, got {temperature}.")
+    if checkpoint_every_steps < 1:
+        raise ValueError(
+            f"checkpoint_every_steps must be >= 1, got {checkpoint_every_steps}."
+        )
     path_parts = {part.lower() for part in checkpoint_dir.parts}
     if dry_run and "real" in path_parts:
         raise ValueError(
@@ -184,12 +189,16 @@ def train_contrastive_encoder(
     else:
         assert shards_dir is not None
         assert dataset is not None
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-        if len(loader) == 0:
+        batches_per_epoch = len(dataset) // batch_size
+        if batches_per_epoch == 0:
             raise ValueError(
                 "No complete training batches are available; no checkpoint was written."
             )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+        start_batch = 0
+        resume_running_loss = 0.0
+        resume_running_batches = 0
+        resume_epoch_complete = True
 
         if resume_from is not None:
             try:
@@ -226,8 +235,7 @@ def train_contrastive_encoder(
             }
             if mismatches:
                 raise ValueError(
-                    "Resume settings differ from the saved checkpoint "
-                    "(saved, requested): "
+                    "Resume settings differ from the saved checkpoint (saved, requested): "
                     f"{mismatches}. Use the original settings or start a fresh run."
                 )
             if int(checkpoint.get("epochs_requested", epochs)) != epochs:
@@ -238,7 +246,25 @@ def train_contrastive_encoder(
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-            start_epoch = int(checkpoint["epoch"]) + 1
+            saved_epoch = int(checkpoint["epoch"])
+            resume_epoch_complete = bool(checkpoint.get("epoch_complete", True))
+            if resume_epoch_complete:
+                start_epoch = saved_epoch + 1
+            else:
+                start_epoch = saved_epoch
+                start_batch = int(checkpoint.get("batch_in_epoch", 0))
+                resume_running_loss = float(checkpoint.get("running_loss", 0.0))
+                resume_running_batches = int(checkpoint.get("running_batches", start_batch))
+                if start_batch < 0 or start_batch >= batches_per_epoch:
+                    raise ValueError(
+                        f"Resume checkpoint has invalid batch_in_epoch={start_batch}; "
+                        f"expected 0..{batches_per_epoch - 1} for a partial epoch."
+                    )
+                if resume_running_batches != start_batch:
+                    raise ValueError(
+                        "Resume checkpoint batch counter is inconsistent: "
+                        f"batch_in_epoch={start_batch}, running_batches={resume_running_batches}."
+                    )
             best_loss = float(checkpoint.get("best_loss", float("inf")))
             trained_steps = int(checkpoint.get("trained_steps", 0))
             history = list(checkpoint.get("history", []))
@@ -255,7 +281,12 @@ def train_contrastive_encoder(
                 logger.warning(
                     "Resume checkpoint has no saved RNG state; continuing with the configured seed."
                 )
-            logger.info("Resuming at epoch %d from %s", start_epoch + 1, resume_from)
+            logger.info(
+                "Resuming from %s at epoch %d, next batch %d.",
+                resume_from,
+                start_epoch + 1,
+                start_batch + 1,
+            )
             if start_epoch >= epochs:
                 best_path = checkpoint_dir / "encoder_best.pt"
                 if best_path.is_file():
@@ -265,72 +296,15 @@ def train_contrastive_encoder(
                     "Resume checkpoint is already at requested epochs but best checkpoint is missing."
                 )
 
-        for epoch in range(start_epoch, epochs):
-            epoch_started = time.perf_counter()
-            model.train()
-            total_loss = 0.0
-            n_batches = 0
-            for batch_idx, (patches, metadata) in enumerate(loader, start=1):
-                try:
-                    patches = patches.to(device_obj, dtype=torch.float32)
-                    if not torch.isfinite(patches).all():
-                        raise ValueError("Input patch batch contains NaN or infinite values.")
-                    v1, v2 = dual_transform(patches)
-                    _, z1 = model(v1)
-                    _, z2 = model(v2)
-                    loss = criterion(z1, z2)
-                    if not torch.isfinite(loss):
-                        raise FloatingPointError(f"Non-finite contrastive loss: {loss.item()}.")
-                    optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    for parameter in model.parameters():
-                        if parameter.grad is not None and not torch.isfinite(parameter.grad).all():
-                            raise FloatingPointError("Non-finite gradient detected before optimizer step.")
-                    optimizer.step()
-                except Exception as exc:
-                    scan_ids = metadata.get("scan_id", "unknown") if isinstance(metadata, dict) else "unknown"
-                    logger.exception(
-                        "Training failed at epoch %d/%d, batch %d/%d, scan_id(s)=%s",
-                        epoch + 1,
-                        epochs,
-                        batch_idx,
-                        len(loader),
-                        scan_ids,
-                    )
-                    raise RuntimeError(
-                        f"Training failed at epoch {epoch + 1}, batch {batch_idx}; "
-                        f"scan_id(s)={scan_ids}. Latest completed epoch checkpoint is retained."
-                    ) from exc
-                total_loss += float(loss.item())
-                n_batches += 1
-                trained_steps += 1
-
-            if n_batches == 0:
-                raise RuntimeError("Training produced zero batches; no checkpoint was written.")
-            avg_loss = total_loss / n_batches
-            scheduler.step()
-            if not torch.isfinite(torch.tensor(avg_loss)):
-                raise FloatingPointError(
-                    f"Epoch {epoch + 1} produced a non-finite mean loss: {avg_loss}."
-                )
-            epoch_seconds = time.perf_counter() - epoch_started
-            history.append(
-                {
-                    "epoch": epoch + 1,
-                    "train_contrastive_loss": avg_loss,
-                    "batches": n_batches,
-                    "epoch_seconds": epoch_seconds,
-                }
-            )
-            logger.info(
-                "Epoch %d/%d - contrastive loss %.5f - %.1f seconds",
-                epoch + 1,
-                epochs,
-                avg_loss,
-                epoch_seconds,
-            )
-
-            payload = {
+        def make_checkpoint_payload(
+            epoch: int,
+            *,
+            epoch_complete: bool,
+            batch_in_epoch: int,
+            running_loss: float,
+            running_batches: int,
+        ) -> dict[str, object]:
+            return {
                 "model_state_dict": model.state_dict(),
                 "embedding_dim": model.embedding_dim,
                 "projection_dim": model.projection_dim,
@@ -339,6 +313,10 @@ def train_contrastive_encoder(
                 "trained_steps": trained_steps,
                 "epochs_requested": epochs,
                 "epoch": epoch,
+                "epoch_complete": epoch_complete,
+                "batch_in_epoch": batch_in_epoch,
+                "running_loss": running_loss,
+                "running_batches": running_batches,
                 "best_loss": best_loss,
                 "seed": seed,
                 "optimizer_state_dict": optimizer.state_dict(),
@@ -359,18 +337,131 @@ def train_contrastive_encoder(
                     "temperature": temperature,
                     "seed": seed,
                     "device": str(device_obj),
+                    "checkpoint_every_steps": checkpoint_every_steps,
                 },
             }
+
+        for epoch in range(start_epoch, epochs):
+            epoch_started = time.perf_counter()
+            model.train()
+            epoch_generator = torch.Generator()
+            epoch_generator.manual_seed(seed + epoch)
+            loader = DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                drop_last=True,
+                generator=epoch_generator,
+            )
+            resume_this_epoch = epoch == start_epoch and not resume_epoch_complete and start_batch > 0
+            total_loss = resume_running_loss if resume_this_epoch else 0.0
+            n_batches = resume_running_batches if resume_this_epoch else 0
+
+            for batch_idx, (patches, metadata) in enumerate(loader, start=1):
+                if resume_this_epoch and batch_idx <= start_batch:
+                    continue
+                try:
+                    patches = patches.to(device_obj, dtype=torch.float32)
+                    if not torch.isfinite(patches).all():
+                        raise ValueError("Input patch batch contains NaN or infinite values.")
+                    v1, v2 = dual_transform(patches)
+                    _, z1 = model(v1)
+                    _, z2 = model(v2)
+                    loss = criterion(z1, z2)
+                    if not torch.isfinite(loss):
+                        raise FloatingPointError(f"Non-finite contrastive loss: {loss.item()}.")
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    for parameter in model.parameters():
+                        if parameter.grad is not None and not torch.isfinite(parameter.grad).all():
+                            raise FloatingPointError(
+                                "Non-finite gradient detected before optimizer step."
+                            )
+                    optimizer.step()
+                except Exception as exc:
+                    scan_ids = (
+                        metadata.get("scan_id", "unknown")
+                        if isinstance(metadata, dict)
+                        else "unknown"
+                    )
+                    logger.exception(
+                        "Training failed at epoch %d/%d, batch %d/%d, scan_id(s)=%s",
+                        epoch + 1,
+                        epochs,
+                        batch_idx,
+                        len(loader),
+                        scan_ids,
+                    )
+                    raise RuntimeError(
+                        f"Training failed at epoch {epoch + 1}, batch {batch_idx}; "
+                        f"scan_id(s)={scan_ids}. Resume from encoder_latest.pt to recover."
+                    ) from exc
+                total_loss += float(loss.item())
+                n_batches += 1
+                trained_steps += 1
+
+                if batch_idx % checkpoint_every_steps == 0 and batch_idx < len(loader):
+                    partial_payload = make_checkpoint_payload(
+                        epoch,
+                        epoch_complete=False,
+                        batch_in_epoch=batch_idx,
+                        running_loss=total_loss,
+                        running_batches=n_batches,
+                    )
+                    _atomic_torch_save(
+                        partial_payload, checkpoint_dir / "encoder_latest.pt"
+                    )
+                    logger.info(
+                        "Saved recovery checkpoint at epoch %d/%d batch %d/%d.",
+                        epoch + 1,
+                        epochs,
+                        batch_idx,
+                        len(loader),
+                    )
+
+            if n_batches == 0:
+                raise RuntimeError(
+                    f"Training produced zero batches in epoch {epoch + 1}; "
+                    "the previous recovery checkpoint, if any, is retained."
+                )
+            avg_loss = total_loss / n_batches
+            if not torch.isfinite(torch.tensor(avg_loss)):
+                raise FloatingPointError(
+                    f"Epoch {epoch + 1} produced a non-finite mean loss: {avg_loss}."
+                )
+            scheduler.step()
+            epoch_seconds = time.perf_counter() - epoch_started
+            history.append(
+                {
+                    "epoch": epoch + 1,
+                    "train_contrastive_loss": avg_loss,
+                    "batches": n_batches,
+                    "epoch_seconds": epoch_seconds,
+                }
+            )
+            logger.info(
+                "Epoch %d/%d - contrastive loss %.5f - %.1f seconds",
+                epoch + 1,
+                epochs,
+                avg_loss,
+                epoch_seconds,
+            )
             if avg_loss < best_loss:
                 best_loss = avg_loss
-                payload["best_loss"] = best_loss
+            payload = make_checkpoint_payload(
+                epoch,
+                epoch_complete=True,
+                batch_in_epoch=len(loader),
+                running_loss=total_loss,
+                running_batches=n_batches,
+            )
+            if avg_loss <= best_loss:
                 _atomic_torch_save(payload, checkpoint_dir / "encoder_best.pt")
             _atomic_torch_save(payload, checkpoint_dir / "encoder_latest.pt")
             history_path = checkpoint_dir / "training_history.csv"
             history_tmp = history_path.with_name(f".{history_path.name}.tmp")
             try:
                 pd.DataFrame(history).to_csv(history_tmp, index=False)
-                # Read back the staged history to detect truncated or malformed writes.
                 verified_history = pd.read_csv(history_tmp)
                 if len(verified_history) != len(history):
                     raise OSError(
@@ -380,6 +471,11 @@ def train_contrastive_encoder(
                 os.replace(history_tmp, history_path)
             finally:
                 history_tmp.unlink(missing_ok=True)
+
+            start_batch = 0
+            resume_running_loss = 0.0
+            resume_running_batches = 0
+            resume_epoch_complete = True
 
     if dry_run:
         save_path = checkpoint_dir / "encoder_smoke_test.pt"
@@ -419,6 +515,12 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--checkpoint-every-steps",
+        type=int,
+        default=25,
+        help="Save a resumable checkpoint every N training batches (default: 25).",
+    )
+    parser.add_argument(
         "--resume-from", type=Path, default=None, help="Resume real training from encoder_latest.pt"
     )
     parser.add_argument(
@@ -437,6 +539,7 @@ def main() -> None:
             device=args.device,
             seed=args.seed,
             resume_from=args.resume_from,
+            checkpoint_every_steps=args.checkpoint_every_steps,
         )
     except Exception:
         logger.exception("Encoder training terminated with an error.")
