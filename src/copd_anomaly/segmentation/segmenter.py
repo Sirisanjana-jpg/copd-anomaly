@@ -49,10 +49,11 @@ class LungSegmenter(Segmenter):
         if requested == "totalsegmentator":
             if has_totalseg:
                 return "totalsegmentator"
-            logger.warning(
-                "TotalSegmentator requested but not installed. Falling back to threshold."
+            raise ImportError(
+                "TotalSegmentator was explicitly requested but is not installed. "
+                "Install the optional segmentation dependency or select backend='threshold' "
+                "for a whole-lung mask; thresholding cannot provide five-lobe labels."
             )
-            return "threshold"
 
         if requested == "lungmask":
             if has_lungmask:
@@ -133,6 +134,7 @@ class LungSegmenter(Segmenter):
     def _segment_totalsegmentator(
         self, volume: np.ndarray, spacing_zyx: tuple[float, float, float]
     ) -> np.ndarray:
+        """Return named TotalSegmentator lung lobes as labels 1..5, never a binary substitute."""
         try:
             import nibabel as nib
             from totalsegmentator.python_api import totalsegmentator
@@ -140,12 +142,57 @@ class LungSegmenter(Segmenter):
             sz, sy, sx = spacing_zyx
             affine = np.diag([sx, sy, sz, 1.0])
             nib_img = nib.Nifti1Image(np.transpose(volume, (2, 1, 0)), affine)
-            seg_nib = totalsegmentator(nib_img, task="lung_vessels")
-            seg_xyz = seg_nib.get_fdata().astype(np.uint8)
-            return np.transpose(seg_xyz, (2, 1, 0))
-        except Exception as e:
-            logger.warning(f"TotalSegmentator failed ({e}); falling back to threshold whole-lung.")
-            return self._segment_threshold(volume)
+            # TotalSegmentator v2's total task labels these five structures as 10..14.
+            # Keep the output as a multilabel map; never infer lobe IDs from spatial position.
+            seg_nib = totalsegmentator(
+                nib_img,
+                task="total",
+                roi_subset=[
+                    "lung_upper_lobe_left",
+                    "lung_lower_lobe_left",
+                    "lung_upper_lobe_right",
+                    "lung_middle_lobe_right",
+                    "lung_lower_lobe_right",
+                ],
+                ml=True,
+            )
+            seg_xyz = np.asarray(seg_nib.get_fdata(), dtype=np.int16)
+            if seg_xyz.shape != nib_img.shape:
+                raise ValueError(
+                    f"TotalSegmentator returned shape {seg_xyz.shape}; expected {nib_img.shape}."
+                )
+            # Canonical project labels: 1 RUL, 2 RML, 3 RLL, 4 LUL, 5 LLL.
+            mapping = {12: 1, 13: 2, 14: 3, 10: 4, 11: 5}
+            present = set(np.unique(seg_xyz).astype(int)) - {0}
+            unexpected = present - set(mapping)
+            if unexpected:
+                raise ValueError(
+                    "TotalSegmentator returned unexpected label IDs "
+                    f"{sorted(unexpected)}; expected a subset of {sorted(mapping)}. "
+                    "Refusing to guess label semantics."
+                )
+            mapped = np.zeros(seg_xyz.shape, dtype=np.uint8)
+            for source_id, project_id in mapping.items():
+                mapped[seg_xyz == source_id] = project_id
+            result = np.transpose(mapped, (2, 1, 0))
+            return validate_lobe_mask(result, expected_shape=volume.shape, require_all=False)
+        except Exception as exc:
+            logger.exception("Five-lobe TotalSegmentator inference failed; no fallback mask is valid.")
+            raise RuntimeError(
+                "Five-lobe segmentation failed. A binary threshold mask is not an acceptable "
+                "substitute for lobe-wise analysis."
+            ) from exc
+
+    def segment_lobes(
+        self, volume: np.ndarray, spacing_zyx: tuple[float, float, float]
+    ) -> np.ndarray:
+        """Require a true five-label mask; never return a whole-lung fallback."""
+        if self.backend != "totalsegmentator":
+            raise RuntimeError(
+                f"Five-lobe segmentation requires TotalSegmentator, not backend={self.backend!r}."
+            )
+        mask = self._segment_totalsegmentator(volume, spacing_zyx)
+        return validate_lobe_mask(mask, expected_shape=volume.shape, require_all=True)
 
     def _segment_lungmask(
         self, volume: np.ndarray, spacing_zyx: tuple[float, float, float]
@@ -161,3 +208,34 @@ class LungSegmenter(Segmenter):
         except Exception as e:
             logger.warning(f"lungmask failed ({e}); falling back to threshold whole-lung.")
             return self._segment_threshold(volume)
+
+
+def validate_lobe_mask(
+    mask: np.ndarray,
+    expected_shape: tuple[int, ...] | None = None,
+    require_all: bool = True,
+) -> np.ndarray:
+    """Validate anatomical label semantics before a mask enters lobe-wise analysis."""
+    labels = np.asarray(mask)
+    if labels.ndim != 3:
+        raise ValueError(f"Lobe mask must be 3D (Z, Y, X), got shape {labels.shape}.")
+    if expected_shape is not None and labels.shape != expected_shape:
+        raise ValueError(
+            f"Lobe mask shape {labels.shape} does not match expected shape {expected_shape}."
+        )
+    if not np.isfinite(labels).all():
+        raise ValueError("Lobe mask contains NaN or infinite values.")
+    if not np.equal(labels, np.round(labels)).all():
+        raise ValueError("Lobe mask contains non-integer label values.")
+    unique_labels = set(np.unique(labels).astype(int))
+    if not unique_labels.issubset({0, 1, 2, 3, 4, 5}):
+        raise ValueError(f"Unsupported lobe labels: {sorted(unique_labels)}.")
+    present = unique_labels - {0}
+    if not present:
+        raise ValueError("Lobe mask is empty.")
+    if require_all and present != {1, 2, 3, 4, 5}:
+        raise ValueError(
+            f"Expected all five lobe labels 1..5; found {sorted(present)}. "
+            "Do not report complete lobe-wise features from a partial mask."
+        )
+    return labels.astype(np.uint8, copy=False)
