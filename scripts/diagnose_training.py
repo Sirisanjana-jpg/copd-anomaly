@@ -88,7 +88,9 @@ def diagnose_training_inputs(
         for index in sample_indices:
             patch, metadata = dataset[index]
             if not torch.isfinite(patch).all():
-                raise ValueError(f"Sample patch at manifest row {index} contains non-finite values.")
+                raise ValueError(
+                    f"Sample patch at manifest row {index} contains non-finite values."
+                )
             if patch.ndim != 4 or patch.shape[0] not in (1, 2):
                 raise ValueError(
                     f"Patch at manifest row {index} has unexpected shape {tuple(patch.shape)}; "
@@ -108,7 +110,9 @@ def diagnose_training_inputs(
         if len({tuple(shape) for shape in sample_shapes}) > 1:
             raise ValueError(f"First/last sample patch shapes differ: {sample_shapes}.")
         report["sample_patch_shapes"] = sample_shapes
-        report["checks"].append("manifest, shard headers, referenced indices, and sample patches passed")
+        report["checks"].append(
+            "manifest, shard headers, referenced indices, and sample patches passed"
+        )
     except Exception as exc:
         report["errors"].append(f"Patch dataset validation failed: {type(exc).__name__}: {exc}")
 
