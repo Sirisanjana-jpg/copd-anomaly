@@ -262,7 +262,7 @@ class CTRATEStreamer:
                 return 0
             stage = "write_shards"
             writer.add_patches(patches, records)
-                logger.info(f"Successfully processed {volume_name}: {len(records)} patches saved.")
+            logger.info("Successfully processed %s: %d patches saved.", volume_name, len(records))
             return len(records)
 
         except Exception as exc:
