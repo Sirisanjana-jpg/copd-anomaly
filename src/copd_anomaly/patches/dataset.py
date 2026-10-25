@@ -223,13 +223,13 @@ class ShardedPatchDataset(Dataset):
                 f"Patch manifest references missing shard files: {missing_shards[:10]}."
             )
         for column in ("lung_fraction", "volume_weight", "laa950_fraction"):
-            numeric_values = pd.to_numeric(self.manifest[column], errors="coerce").to_numpy(
-                dtype=np.float64
-            )
+            numeric_series = pd.to_numeric(self.manifest[column], errors="coerce")
+            numeric_values = numeric_series.to_numpy(dtype=np.float64)
             if not np.isfinite(numeric_values).all():
                 raise ValueError(
                     f"Patch manifest column {column!r} contains non-numeric or non-finite values."
                 )
+            self.manifest[column] = numeric_series.astype(np.float64)
         if not self.manifest["lung_fraction"].between(0.0, 1.0).all():
             raise ValueError("Patch manifest lung_fraction values must be within [0, 1].")
         if not self.manifest["laa950_fraction"].between(0.0, 1.0).all():
@@ -244,6 +244,7 @@ class ShardedPatchDataset(Dataset):
             or not np.equal(lobe_values, np.floor(lobe_values)).all()
         ):
             raise ValueError("Patch manifest contains missing or non-integer lobe IDs.")
+        self.manifest["lobe_id"] = lobe_values.astype(np.int64)
         lobe_ids = set(lobe_values.astype(int))
         if not lobe_ids.issubset({-1, 1, 2, 3, 4, 5}):
             raise ValueError(f"Patch manifest contains unsupported lobe IDs: {sorted(lobe_ids)}.")
