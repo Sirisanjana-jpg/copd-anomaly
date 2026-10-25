@@ -71,12 +71,21 @@ def fit_density_estimator(
             raise ValueError("No eligible normal patches found. Check report labels and LAA-950 metadata.")
         loader = DataLoader(dataset, batch_size=32, shuffle=False)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        encoder = ResNet3DEncoder(in_channels=1, base_filters=16, embedding_dim=128, projection_dim=64).to(device)
         checkpoint = torch.load(encoder_ckpt, map_location=device, weights_only=False)
         if checkpoint.get("training_mode") == "synthetic_dry_run":
             raise ValueError("Refusing synthetic encoder checkpoint for real density fitting.")
         if "model_state_dict" not in checkpoint:
             raise ValueError(f"Invalid encoder checkpoint (missing model_state_dict): {encoder_ckpt}")
+        input_channels = int(checkpoint.get("in_channels", 1))
+        sample_patch, _ = dataset[0]
+        if int(sample_patch.shape[0]) != input_channels:
+            raise ValueError(
+                f"Encoder expects {input_channels} input channels but patch data has "
+                f"{sample_patch.shape[0]}. Rebuild shards or use the matching encoder."
+            )
+        encoder = ResNet3DEncoder(
+            in_channels=input_channels, base_filters=16, embedding_dim=128, projection_dim=64
+        ).to(device)
         encoder.load_state_dict(checkpoint["model_state_dict"])
         encoder.eval()
         embeddings = []
