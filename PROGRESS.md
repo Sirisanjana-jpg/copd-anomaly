@@ -9,12 +9,12 @@
 | Repository scaffold and dependency metadata | Implemented; CI not yet clean | Re-run Ruff and pytest on the remediation branch |
 | DIR-Lab ingestion / coordinate geometry | Partially implemented; real runtime verification pending | Audit all 10 pairs, geometry, HU conversion and landmark conventions |
 | Lung and five-lobe segmentation | **Unverified / not publication-ready** | Validate backend output and all five labels; reject binary-only masks for lobe analysis |
-| Registration and TRE | Synthetic unit test exists; DIR-Lab results unverified | Correct transform direction, confirm coordinate units, run all available landmarks and report per-case TRE |
-| Patch extraction | Implemented but lobe assignment not connected | Check nonempty manifest, patch counts, real HU values, patient-level splits, masks and lobe IDs |
-| Encoder training | Training loop implemented; no real training verified here | Train from real shards; save logs, config, seed, epoch loss and best checkpoint |
+| Registration and TRE | Transform direction corrected in remediation branch; real DIR-Lab results unverified | Confirm coordinate units, run all available landmarks, inspect warped volumes and report per-case TRE |
+| Patch extraction | Added fail-fast input/geometry/empty-output checks in remediation branch; lobe assignment still not connected | Run extraction on real data; check counts, HU values, patient-level splits, masks and lobe IDs |
+| Encoder training | Added resumable epoch checkpoints, history CSV, and 1-/2-channel input detection; no real training verified here | Train from real shards; inspect loss, checkpoint metadata, and stability over the intended run |
 | Density fitting | Implementation present; depends on a real trained encoder and eligible real patches | Fit only on defined normal training patches; report counts and cohort selection |
-| Real anomaly inference / proxy evaluation | **Not implemented end-to-end** | Must connect real patches → encoder embeddings → density scores → patient aggregation → held-out report labels |
-| Lobe feature analysis | Previously fabricated lobe IDs/scores; real path now fails closed | Connect validated lobe masks and real patch scores before generating real feature tables |
+| Real anomaly inference / proxy evaluation | **Not implemented end-to-end**; now fails closed instead of returning an empty report | Connect real patches → encoder embeddings → density scores → patient aggregation → held-out report labels |
+| Lobe feature analysis | Previously fabricated lobe IDs/scores; remediation branch blocks real output until inputs are connected and preserves missing lobes as missing | Connect validated lobe masks and real patch scores before generating real feature tables |
 | Synthetic multimodal / exacerbation ablations | Synthetic software tests only | Never present as clinical evidence; requires a real labelled cohort for clinical claims |
 | Publication readiness | **Blocked** | Clean CI, reproducible real-data pipeline, cohort-level leakage checks, validated registration/segmentation and held-out evaluation |
 
@@ -29,7 +29,7 @@
 
 ## Immediate execution order
 
-1. Run CI on this branch and fix actual test/lint failures.
+1. Run CI on this branch and fix actual test/lint failures. A one-time formatter pass is being attempted; do not treat CI as passing until the final run completes.
 2. Audit DIR-Lab NIfTI geometry, HU conversion, segmentation and registration direction.
 3. Generate and QC real patch shards; ensure patient-level split integrity and document selection.
 4. Train encoder on real patches; save reproducible config and loss history. Training may take 1–2 days depending on GPU, data volume and patch count.
