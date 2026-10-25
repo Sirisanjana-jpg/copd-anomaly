@@ -98,6 +98,14 @@ def stream_ctrate(
     max_volumes_per_split: int | None = None,
     resume: bool = True,
 ) -> dict[str, int]:
+    if tier not in {"lean", "medium", "full"}:
+        raise ValueError(f"Unsupported tier {tier!r}; choose lean, medium, or full.")
+    if patch_size < 8:
+        raise ValueError(f"patch_size must be >= 8 voxels, got {patch_size}.")
+    if max_patches_per_scan < 1 or shard_size < 1:
+        raise ValueError("max_patches_per_scan and shard_size must both be >= 1.")
+    if max_volumes_per_split is not None and max_volumes_per_split < 1:
+        raise ValueError("max_volumes_per_split must be >= 1 when supplied.")
     if not (os.environ.get("HF_TOKEN") or os.environ.get("HF_READ")):
         raise OSError(
             "CT-RATE access token not found. Set HF_TOKEN (recommended) or HF_READ in your environment; "
@@ -241,14 +249,19 @@ def stream_ctrate(
             split_summary[split_name] = 0
         logger.info("Split %s complete: %d patch records.", split_name, split_summary[split_name])
 
-    if split_summary.get("ctrate_train", 0) == 0:
+    if split_summary.get("train", 0) == 0:
         raise RuntimeError(
             "No training patches were produced. Check the access token, CT-RATE file names, "
             "segmentation output, and patch-size/lung-fraction settings."
         )
-    (output_dir / "patch_counts.json").write_text(
-        json.dumps(split_summary, indent=2), encoding="utf-8"
-    )
+    summary_path = output_dir / "patch_counts.json"
+    summary_tmp = summary_path.with_name(f".{summary_path.name}.tmp")
+    try:
+        summary_tmp.write_text(json.dumps(split_summary, indent=2), encoding="utf-8")
+        json.loads(summary_tmp.read_text(encoding="utf-8"))
+        os.replace(summary_tmp, summary_path)
+    finally:
+        summary_tmp.unlink(missing_ok=True)
     return split_summary
 
 
