@@ -27,14 +27,18 @@ LOBE_LABELS = {
 }
 
 
-def segment_directory(input_dir: Path, output_dir: Path, cases: list[str] | None = None) -> list[Path]:
+def segment_directory(
+    input_dir: Path, output_dir: Path, cases: list[str] | None = None
+) -> list[Path]:
     if not input_dir.is_dir():
         raise FileNotFoundError(f"Input NIfTI directory does not exist: {input_dir}")
     scans = sorted(input_dir.glob("*_insp.nii.gz"))
     if cases:
         scans = [path for path in scans if path.name.split("_")[0] in cases]
     if not scans:
-        raise FileNotFoundError(f"No *_insp.nii.gz scans found under {input_dir} for cases={cases}.")
+        raise FileNotFoundError(
+            f"No *_insp.nii.gz scans found under {input_dir} for cases={cases}."
+        )
 
     segmenter = LungSegmenter(backend="totalsegmentator")
     output_dir.mkdir(parents=True, exist_ok=True)
