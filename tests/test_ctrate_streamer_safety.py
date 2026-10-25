@@ -10,7 +10,7 @@ from copd_anomaly.data.ctrate_streamer import (
     extract_patient_id,
     verify_split_leakage,
 )
-from scripts.stream_ctrate import stream_ctrate
+from scripts.stream_ctrate import _load_resume_writer, stream_ctrate
 
 
 def test_extract_patient_id_uses_split_prefix() -> None:
@@ -48,3 +48,40 @@ def test_streaming_requires_token_before_file_or_network_access(
             output_dir=tmp_path / "out",
         )
     assert not (tmp_path / "out").exists()
+
+
+
+def test_invalid_tier_fails_closed() -> None:
+    train = pd.DataFrame({"VolumeName": ["train_10001_a_1.nii.gz"]})
+    valid = pd.DataFrame({"VolumeName": ["valid_20001_a_1.nii.gz"]})
+    with pytest.raises(ValueError, match="Unknown CT-RATE tier"):
+        create_tiered_splits(train, valid, tier="typo")
+
+
+def test_resume_refuses_orphan_shards(tmp_path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
+    (split_dir / "shard_0000.npy").write_bytes(b"interrupted write")
+    with pytest.raises(FileNotFoundError, match="without a manifest"):
+        _load_resume_writer(split_dir, shard_size=10, resume=True)
+
+
+def test_streaming_rejects_invalid_patch_size_before_network_access(tmp_path) -> None:
+    monkeypatch_env = {"HF_TOKEN": "dummy"}
+    import os
+
+    previous = os.environ.get("HF_TOKEN")
+    os.environ["HF_TOKEN"] = monkeypatch_env["HF_TOKEN"]
+    try:
+        with pytest.raises(ValueError, match="patch_size must be"):
+            stream_ctrate(
+                train_metadata_path=tmp_path / "missing_train.csv",
+                valid_metadata_path=tmp_path / "missing_valid.csv",
+                output_dir=tmp_path / "out",
+                patch_size=1,
+            )
+    finally:
+        if previous is None:
+            os.environ.pop("HF_TOKEN", None)
+        else:
+            os.environ["HF_TOKEN"] = previous
