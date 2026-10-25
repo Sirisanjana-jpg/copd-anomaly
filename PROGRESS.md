@@ -8,13 +8,13 @@
 |---|---|---|
 | Repository scaffold and dependency metadata | Implemented; CI not yet clean | Re-run Ruff and pytest on the remediation branch |
 | DIR-Lab ingestion / coordinate geometry | Partially implemented; real runtime verification pending | Audit all 10 pairs, geometry, HU conversion and landmark conventions |
-| Lung and five-lobe segmentation | **Unverified / not publication-ready** | Validate backend output and all five labels; reject binary-only masks for lobe analysis |
-| Registration and TRE | Transform direction corrected in remediation branch; real DIR-Lab results unverified | Confirm coordinate units, run all available landmarks, inspect warped volumes and report per-case TRE |
-| Patch extraction | Added fail-fast input/geometry/empty-output checks in remediation branch; lobe assignment still not connected | Run extraction on real data; check counts, HU values, patient-level splits, masks and lobe IDs |
+| Lung and five-lobe segmentation | Implementation added; real runtime/accuracy unverified | `scripts/segment_lobes.py` and CT-RATE `--segment-lobes` use named TotalSegmentator labels and fail closed; visually/QC-validate all five masks on real scans |
+| Registration and TRE | Physical origin/direction now propagated; real DIR-Lab results unverified | Run all available landmarks; verify transform convention against known landmarks, inspect warped volumes and report per-case TRE |
+| Patch extraction | Lobe-mask integration implemented; real output unverified | Optional `--lobe-masks-dir` in `make_patches.py` and `--segment-lobes` in CT-RATE streamer write actual lobe IDs; audit counts, HU values, split leakage, masks and coverage |
 | Encoder training | Added resumable epoch checkpoints, history CSV, and 1-/2-channel input detection; no real training verified here | Train from real shards; inspect loss, checkpoint metadata, and stability over the intended run |
 | Density fitting | Implementation present; depends on a real trained encoder and eligible real patches | Fit only on defined normal training patches; report counts and cohort selection |
-| Real anomaly inference / proxy evaluation | **Not implemented end-to-end**; now fails closed instead of returning an empty report | Connect real patches → encoder embeddings → density scores → patient aggregation → held-out report labels |
-| Lobe feature analysis | Previously fabricated lobe IDs/scores; remediation branch blocks real output until inputs are connected and preserves missing lobes as missing | Connect validated lobe masks and real patch scores before generating real feature tables |
+| Real anomaly inference / proxy evaluation | Patch/scan/patient scoring implemented; not run or validated on real data; held-out report-label evaluation remains incomplete | Run inference on held-out real shards, audit outputs and leakage; connect CT-RATE report labels using a pre-specified, reproducible label extraction/validation method before proxy AUC |
+| Lobe feature analysis | Real patch-score input path implemented; not validated on real data | Generate masks, extract patches with lobe IDs, score them, and run `scripts/lobe_analysis.py`; verify all five lobes are covered per scan |
 | Synthetic multimodal / exacerbation ablations | Synthetic software tests only | Never present as clinical evidence; requires a real labelled cohort for clinical claims |
 | Publication readiness | **Blocked** | Clean CI, reproducible real-data pipeline, cohort-level leakage checks, validated registration/segmentation and held-out evaluation |
 
@@ -29,13 +29,13 @@
 
 ## Immediate execution order
 
-1. Run CI on this branch and fix actual test/lint failures. A one-time formatter pass is being attempted; do not treat CI as passing until the final run completes.
-2. Audit DIR-Lab NIfTI geometry, HU conversion, segmentation and registration direction.
+1. Run CI on this branch and fix actual test/lint failures. Latest CI status must be checked after the final code commit; do not treat CI as passing until both Python jobs complete successfully.
+2. Audit DIR-Lab NIfTI geometry/HU conversion; validate the TotalSegmentator label map and audit registration/TRE on real landmarks.
 3. Generate and QC real patch shards; ensure patient-level split integrity and document selection.
 4. Train encoder on real patches; save reproducible config and loss history. Training may take 1–2 days depending on GPU, data volume and patch count.
 5. Fit density model only from eligible training-set embeddings.
-6. Implement real patch scoring and patient-level aggregation; evaluate report-label proxy only on a held-out set and label it correctly.
-7. Connect validated lobe labels to patch scores; test missing-lobe handling and per-lobe coverage.
+6. Run real patch scoring and patient-level aggregation; then implement and validate held-out report-label proxy evaluation without describing it as clinical diagnosis.
+7. Run five-lobe segmentation and lobe-aware patch extraction, then verify missing-lobe handling and per-lobe coverage.
 8. Keep clinical/exacerbation modeling blocked until a real cohort with outcome labels is available.
 
 ## Verification log
@@ -51,7 +51,17 @@
 ### Not verified in this review
 - No local execution of the full test suite was available through the GitHub connector.
 - No training was run here, and no new encoder/density checkpoint was validated.
-- No real CT volumes, masks, landmarks, or patch shards were processed during this review.
+- No real CT volumes, masks, landmarks, or patch shards have yet been processed in this environment. New scoring/segmentation code remains unverified until smoke-tested.
 - No real-data metrics or clinical performance claims have been established.
 
 Update this file only when a result is reproducibly verified; include command, dataset split, relevant counts, and CI run/commit.
+
+
+## Additional implementation changes (2026-10-25)
+
+- Added strict validation for five-lobe masks and an explicit TotalSegmentator-based lobe-generation CLI. TotalSegmentator label IDs are mapped by documented anatomical class names; unexpected IDs fail instead of being guessed.
+- Added optional lobe-aware CT-RATE streaming via `--segment-lobes` and optional DIR-Lab patch extraction via `--lobe-masks-dir`. The default threshold-only path remains global-only and must not be used for lobe-wise claims.
+- Added real patch anomaly scoring with scan/patient aggregation and real lobe feature construction from scored patches. These outputs are marked `REAL_CT_PATCH_INFERENCE_UNVALIDATED`; they are research intermediates, not validated biomarkers or clinical predictions.
+- Updated registration to preserve NIfTI origin/direction and reject implicit shape-mismatch resampling, which would invalidate landmark comparisons.
+- Added `docs/CLOUD_RUNTIME.md` describing path-based Colab/Kaggle execution and `docs/KAGGLE_REAL_DATA_SMOKE.md` for Kaggle smoke validation.
+- Still blocked externally: clinical exacerbation prediction requires a suitable approved cohort with longitudinal, timestamped exacerbation outcomes and baseline covariates. No code change can manufacture this evidence. CT-RATE report-label proxy evaluation also requires a validated report-label extraction method and held-out evaluation.
