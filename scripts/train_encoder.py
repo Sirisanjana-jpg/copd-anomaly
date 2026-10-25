@@ -8,6 +8,7 @@ CSV loss history. Synthetic five-step training is explicit and is never a resear
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import time
 from pathlib import Path
@@ -23,6 +24,26 @@ from copd_anomaly.patches.dataset import ShardedPatchDataset
 from copd_anomaly.utils.helpers import get_logger, set_seed
 
 logger = get_logger("train_encoder")
+
+
+def _attach_training_file_log(log_path: Path) -> None:
+    """Persist console training diagnostics to a run-specific log file."""
+    logger = logging.getLogger("train_encoder")
+    resolved_path = str(log_path.resolve())
+    if any(
+        isinstance(handler, logging.FileHandler)
+        and handler.baseFilename == resolved_path
+        for handler in logger.handlers
+    ):
+        return
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
 
 
 def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
@@ -89,6 +110,7 @@ def train_contrastive_encoder(
 
     set_seed(seed)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    _attach_training_file_log(checkpoint_dir / "training.log")
     if device != "auto":
         device_obj = torch.device(device)
         if device_obj.type == "cuda" and not torch.cuda.is_available():
