@@ -77,6 +77,15 @@ def register_pairs(
                 f"Voxel spacing mismatch for {case_id}: {zooms_xyz} vs {exp_zooms_xyz}."
             )
         spacing_zyx = (float(zooms_xyz[2]), float(zooms_xyz[1]), float(zooms_xyz[0]))
+        affine_linear = np.asarray(img_insp.affine[:3, :3], dtype=np.float64)
+        direction_matrix = affine_linear / np.asarray(zooms_xyz, dtype=np.float64)[None, :]
+        if not np.allclose(direction_matrix.T @ direction_matrix, np.eye(3), atol=1e-4):
+            raise ValueError(
+                f"Non-orthonormal NIfTI direction for {case_id}; explicitly reorient/resample "
+                "the CTs and landmarks before registration."
+            )
+        origin_xyz = tuple(float(v) for v in img_insp.affine[:3, 3])
+        direction_xyz = tuple(float(v) for v in direction_matrix.ravel())
 
         # Load or generate masks
         insp_mask_path = masks_dir / f"{case_id}_insp_mask.nii.gz"
@@ -112,6 +121,8 @@ def register_pairs(
             fixed_mask=mask_insp,
             moving_mask=mask_exp,
             spacing_zyx=spacing_zyx,
+            origin_xyz=origin_xyz,
+            direction_xyz=direction_xyz,
         )
 
         # Save warped volume
@@ -134,7 +145,11 @@ def register_pairs(
             # into input/moving (expiration) space. Transform inhale landmarks, then
             # compare them with the expert exhale landmarks in that same coordinate space.
             pts_insp_warped_to_exp = registrar.transform_points(
-                pts_insp, reg_result.transform, spacing_zyx
+                pts_insp,
+                reg_result.transform,
+                spacing_zyx,
+                origin_xyz=origin_xyz,
+                direction_xyz=direction_xyz,
             )
             tre_stats = evaluate_tre(pts_exp, pts_insp, pts_insp_warped_to_exp, spacing_zyx)
             tre_stats["case_id"] = case_id
