@@ -36,7 +36,7 @@ Outputs are stored in separate directories:
 - `data/processed/ctrate_smoke/val/`
 - `data/processed/ctrate_smoke/test/`
 
-Each split contains `patch_manifest.parquet`, shard files, `selected_volumes.csv`, `selected_patient_ids.txt`, and `stream_log.csv`. Review `patch_counts.json`, `stream_config.json`, `stream_summary.json`, and all `failed` / `no_patches` log rows. Failed rows include the exception type, stage, message, and traceback; the summary lists per-split status counts and failed volume names. The current code filters training density candidates by LAA-950 only; this is a heuristic, not the full CT-RATE report-negative normality definition described in the project plan.
+Each split contains `patch_manifest.parquet`, shard files, `selected_volumes.csv`, `selected_patient_ids.txt`, and `stream_log.csv`. The output root also contains `streaming.log` with stage-specific stack traces. Review `patch_counts.json`, `stream_config.json`, `stream_summary.json`, and all `failed` / `no_patches` log rows. Failed rows include the exception type, stage, message, and traceback; the summary lists per-split status counts and failed volume names. The current code filters training density candidates by LAA-950 only; this is a heuristic, not the full CT-RATE report-negative normality definition described in the project plan.
 
 ## 2. Stream the intended cohort
 
@@ -72,6 +72,7 @@ The script detects whether patches have one input channel or paired channels and
 - `outputs/real/checkpoints/encoder_best.pt` — best epoch by training contrastive loss
 - `outputs/real/checkpoints/encoder_latest.pt` — latest epoch, optimizer/scheduler state, and history for resuming
 - `outputs/real/checkpoints/training_history.csv` — per-epoch loss, batch count, and elapsed seconds
+- `outputs/real/checkpoints/training.log` — persistent console output, failure traceback, and batch/scan context
 
 If interrupted, resume using the **same total epoch count and settings**:
 
@@ -89,7 +90,7 @@ Fit the density estimator only from eligible patches in the training split:
 python scripts/fit_density.py --shards-dir data/processed/ctrate_lean/train --encoder-ckpt outputs/real/checkpoints/encoder_best.pt --output-model outputs/real/checkpoints/density_model.joblib --model-type gmm --components 8
 ```
 
-Check how many patches pass the LAA-950 filter before interpreting the result. If too few eligible patches remain, do not silently loosen the threshold; document a scientifically justified selection rule and rerun with a fresh, versioned output.
+Check `outputs/real/checkpoints/density_fit.log` and how many patches pass the LAA-950 filter before interpreting the result. If too few eligible patches remain, do not silently loosen the threshold; document a scientifically justified selection rule and rerun with a fresh, versioned output.
 
 ## 6. Current pipeline boundary
 
