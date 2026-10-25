@@ -30,7 +30,9 @@ def test_failed_checkpoint_write_preserves_previous_checkpoint(tmp_path: Path) -
     destination = tmp_path / "encoder_latest.pt"
     _atomic_torch_save({"training_mode": "real_patch_training", "epoch": 1}, destination)
 
-    with pytest.raises(pickle.PicklingError):
+    # Torch/Python versions may surface this serialization failure as either
+    # pickle.PicklingError or AttributeError for a local lambda.
+    with pytest.raises((pickle.PicklingError, AttributeError)):
         _atomic_torch_save(
             {"training_mode": "real_patch_training", "bad_value": lambda: None},
             destination,
