@@ -38,6 +38,8 @@ class GaussianMixtureDensity(DensityModel):
         self.covariance_type = covariance_type
         self.random_state = random_state
         self.gmm: GaussianMixture | None = None
+        self.training_mode: str | None = None
+        self.fit_metadata: dict[str, object] = {}
 
     def fit(self, z_normal: np.ndarray | torch.Tensor) -> None:
         if isinstance(z_normal, torch.Tensor):
@@ -64,6 +66,7 @@ class GaussianMixtureDensity(DensityModel):
             max_iter=150,
         )
         self.gmm.fit(z_normal)
+        self.fit_metadata["fit_sample_count"] = int(n_samples)
         if not self.gmm.converged_:
             raise RuntimeError(
                 f"GMM did not converge after {self.gmm.n_iter_} iterations; "
@@ -92,6 +95,8 @@ class GaussianMixtureDensity(DensityModel):
                         "n_components": self.n_components,
                         "covariance_type": self.covariance_type,
                     },
+                    "training_mode": self.training_mode,
+                    "fit_metadata": self.fit_metadata,
                 },
                 temporary,
             )
@@ -107,6 +112,8 @@ class GaussianMixtureDensity(DensityModel):
         data = joblib.load(path)
         obj = cls(**data["params"])
         obj.gmm = data["gmm"]
+        obj.training_mode = data.get("training_mode")
+        obj.fit_metadata = data.get("fit_metadata", {})
         return obj
 
 
