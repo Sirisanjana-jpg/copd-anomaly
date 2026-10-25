@@ -73,7 +73,7 @@ ABLATION_FEATURE_SETS = {
 
 def run_ablation_experiments(
     cohort_path: Path = Path("data/processed/synthetic_cohort.parquet"),
-    output_report: Path = Path("reports/multimodal_ablation_results.csv"),
+    output_report: Path = Path("outputs/synthetic/reports/multimodal_ablation_results.csv"),
     n_splits: int = 5,
     seed: int = 42,
 ) -> pd.DataFrame:
