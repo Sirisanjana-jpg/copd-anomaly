@@ -4,7 +4,7 @@ This runbook describes how to prepare a real CT-RATE patch dataset and train the
 
 ## 0. Verify access and environment
 
-Use a machine with sufficient disk/RAM and preferably a CUDA-capable GPU. Activate Python 3.10 or 3.11 and install the project:
+Use a machine with sufficient disk/RAM and preferably a CUDA-capable GPU. Use Python 3.10, 3.11, or 3.12 and install the project:
 
 ```powershell
 python -m pip install -e ".[dev]"
