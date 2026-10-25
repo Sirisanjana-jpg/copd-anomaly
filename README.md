@@ -1,7 +1,7 @@
 # COPD-Anomaly: Deep Anomaly-Based Assessment of Chest CT & Lobe-Wise Exacerbation Risk
 
 [![CI](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml)
-[![Python 3.10 | 3.11](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
+[![Python 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![License: TODO](https://img.shields.io/badge/license-TODO-yellow.svg)](#license--terms)
 
 A modular, reproducible implementation and extension of the self-supervised anomaly quantification method described by **Almeida et al. (2024)** (*"Prediction of disease severity in COPD: a deep learning approach for anomaly-based quantitative assessment of chest CT"*, *European Radiology*, method name **cOOpD**).
