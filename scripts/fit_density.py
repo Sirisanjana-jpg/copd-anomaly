@@ -8,6 +8,7 @@ synthetic output area by default.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,23 @@ from copd_anomaly.patches.dataset import ShardedPatchDataset
 from copd_anomaly.utils.helpers import get_logger, set_seed
 
 logger = get_logger("fit_density")
+
+
+def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
+    """Write and verify a Torch artifact before atomically publishing it."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        with temporary.open("wb") as handle:
+            torch.save(payload, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        check = torch.load(temporary, map_location="cpu", weights_only=False)
+        if not isinstance(check, dict) or "training_mode" not in check:
+            raise IOError(f"Density checkpoint verification failed for {destination}.")
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def fit_density_estimator(
@@ -117,6 +135,8 @@ def fit_density_estimator(
         if not embeddings:
             raise ValueError("No embeddings extracted from eligible patches.")
         z_normal = np.concatenate(embeddings, axis=0)
+        if not np.isfinite(z_normal).all():
+            raise FloatingPointError("Encoder produced NaN or infinite embeddings; density model not saved.")
         if z_normal.ndim != 2 or z_normal.shape[0] < max(2, n_components):
             raise ValueError(
                 f"Need at least max(2, n_components)={max(2, n_components)} embeddings; got {z_normal.shape}."
@@ -132,7 +152,7 @@ def fit_density_estimator(
     else:
         density_model = RealNVPFlowDensity(dim=z_normal.shape[1], n_layers=4, epochs=10)
         density_model.fit(z_normal)
-        torch.save(
+        _atomic_torch_save(
             {
                 "flow_state": density_model.flow.state_dict(),
                 "dim": z_normal.shape[1],
