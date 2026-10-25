@@ -200,7 +200,9 @@ class LungSegmenter(Segmenter):
             result = np.transpose(mapped, (2, 1, 0))
             return validate_lobe_mask(result, expected_shape=volume.shape, require_all=False)
         except Exception as exc:
-            logger.exception("Five-lobe TotalSegmentator inference failed; no fallback mask is valid.")
+            logger.exception(
+                "Five-lobe TotalSegmentator inference failed; no fallback mask is valid."
+            )
             raise RuntimeError(
                 "Five-lobe segmentation failed. A binary threshold mask is not an acceptable "
                 "substitute for lobe-wise analysis."
