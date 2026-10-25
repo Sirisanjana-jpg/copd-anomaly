@@ -8,6 +8,7 @@ for millions of 3D thoracic CT patches without RAM exhaustion.
 from __future__ import annotations
 
 from collections.abc import Callable
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,8 @@ class ShardedPatchWriter:
         shard_size: int = 1000,
     ) -> None:
         self.output_dir = Path(output_dir)
+        if shard_size < 1:
+            raise ValueError(f"shard_size must be >= 1, got {shard_size}.")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.shard_size = shard_size
         self.current_shard_idx = 0
@@ -44,7 +47,24 @@ class ShardedPatchWriter:
         """
         Adds patches (N, C, P, P, P) and corresponding records to the writer.
         """
+        if len(patches) != len(records):
+            raise ValueError(
+                f"Patch/record count mismatch: {len(patches)} patches but {len(records)} records."
+            )
+        if patches.ndim != 5:
+            raise ValueError(
+                f"Expected patches shaped (N, C, Z, Y, X), got array shape {patches.shape}."
+            )
+        if not np.issubdtype(patches.dtype, np.number) or not np.isfinite(patches).all():
+            raise ValueError("Patch array contains non-numeric or non-finite values.")
+        if patches.dtype != np.uint8:
+            raise ValueError(f"Patch shards must be uint8; received {patches.dtype}.")
+        if len(patches) == 0:
+            return
+        patch_shape = tuple(patches.shape[1:])
         for i in range(len(patches)):
+            if tuple(patches[i].shape) != patch_shape:
+                raise ValueError(f"Inconsistent patch shape at index {i}: {patches[i].shape}.")
             self.buffer_patches.append(patches[i])
             rec_dict = {
                 "patch_id": records[i].patch_id,
@@ -71,7 +91,23 @@ class ShardedPatchWriter:
         shard_name = f"shard_{self.current_shard_idx:04d}.npy"
         shard_path = self.output_dir / shard_name
         arr = np.stack(self.buffer_patches, axis=0)  # Shape (M, C, P, P, P) uint8
-        np.save(shard_path, arr)
+        temp_path = shard_path.with_name(f".{shard_path.name}.tmp")
+        try:
+            with temp_path.open("wb") as handle:
+                np.save(handle, arr, allow_pickle=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Re-open before publishing so a failed/partial write is never treated as a shard.
+            check = np.load(temp_path, mmap_mode="r", allow_pickle=False)
+            if check.shape != arr.shape or check.dtype != np.uint8:
+                raise IOError(
+                    f"Shard verification failed for {shard_name}: "
+                    f"shape={check.shape}, dtype={check.dtype}."
+                )
+            os.replace(temp_path, shard_path)
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
         logger.info(
             f"Saved {shard_name} with {len(arr)} patches ({arr.nbytes / (1024 * 1024):.1f} MB)"
         )
@@ -87,9 +123,27 @@ class ShardedPatchWriter:
         manifest_path = self.output_dir / "patch_manifest.parquet"
         if self.all_manifest_records:
             df = pd.DataFrame(self.all_manifest_records)
-            df.to_parquet(manifest_path, index=False)
-            df.to_csv(manifest_path.with_suffix(".csv"), index=False)
-            logger.info(f"Wrote patch manifest to {manifest_path} ({len(df)} total patches)")
+            parquet_tmp = manifest_path.with_name(f".{manifest_path.name}.tmp")
+            csv_path = manifest_path.with_suffix(".csv")
+            csv_tmp = csv_path.with_name(f".{csv_path.name}.tmp")
+            try:
+                df.to_parquet(parquet_tmp, index=False)
+                # Verify the staged manifest before atomically publishing it.
+                check = pd.read_parquet(parquet_tmp)
+                required = {"patch_id", "scan_id", "shard_name", "index_in_shard"}
+                missing = required - set(check.columns)
+                if missing or len(check) != len(df):
+                    raise IOError(
+                        f"Manifest verification failed: missing={sorted(missing)}, "
+                        f"rows={len(check)} expected={len(df)}."
+                    )
+                df.to_csv(csv_tmp, index=False)
+                os.replace(parquet_tmp, manifest_path)
+                os.replace(csv_tmp, csv_path)
+            finally:
+                parquet_tmp.unlink(missing_ok=True)
+                csv_tmp.unlink(missing_ok=True)
+            logger.info("Wrote patch manifest to %s (%d total patches)", manifest_path, len(df))
         return manifest_path
 
 
@@ -107,6 +161,8 @@ class ShardedPatchDataset(Dataset):
         max_cached_shards: int = 4,
     ) -> None:
         self.dataset_dir = Path(dataset_dir)
+        if max_cached_shards < 1:
+            raise ValueError(f"max_cached_shards must be >= 1, got {max_cached_shards}.")
         manifest_path = self.dataset_dir / "patch_manifest.parquet"
         if not manifest_path.exists():
             manifest_csv = self.dataset_dir / "patch_manifest.csv"
@@ -117,7 +173,33 @@ class ShardedPatchDataset(Dataset):
         else:
             self.manifest = pd.read_parquet(manifest_path)
 
-        if normal_only and not self.manifest.empty and "laa950_fraction" in self.manifest.columns:
+        if self.manifest.empty:
+            raise ValueError(
+                f"No patch records found in {self.dataset_dir}. "
+                "Check the patch manifest and streaming failure log."
+            )
+        required_columns = {
+            "patch_id", "patient_id", "scan_id", "shard_name", "index_in_shard",
+            "lobe_id", "lung_fraction", "laa950_fraction",
+        }
+        missing_columns = required_columns - set(self.manifest.columns)
+        if missing_columns:
+            raise ValueError(
+                f"Patch manifest at {self.dataset_dir} is missing columns: {sorted(missing_columns)}."
+            )
+        if self.manifest[["shard_name", "index_in_shard"]].isna().any().any():
+            raise ValueError("Patch manifest contains missing shard references.")
+        if (self.manifest["index_in_shard"].astype(int) < 0).any():
+            raise ValueError("Patch manifest contains negative index_in_shard values.")
+        missing_shards = sorted(
+            name for name in self.manifest["shard_name"].astype(str).unique()
+            if not (self.dataset_dir / name).is_file()
+        )
+        if missing_shards:
+            raise FileNotFoundError(
+                f"Patch manifest references missing shard files: {missing_shards[:10]}."
+            )
+        if normal_only and "laa950_fraction" in self.manifest.columns:
             self.manifest = self.manifest[
                 self.manifest["laa950_fraction"] <= normal_emphysema_cap
             ].reset_index(drop=True)
@@ -141,7 +223,15 @@ class ShardedPatchDataset(Dataset):
             return self._shard_cache[shard_name]
 
         shard_path = self.dataset_dir / shard_name
-        data = np.load(shard_path, mmap_mode="r")
+        try:
+            data = np.load(shard_path, mmap_mode="r", allow_pickle=False)
+        except Exception as exc:
+            raise IOError(f"Cannot read patch shard {shard_path}: {exc}") from exc
+        if data.ndim != 5 or data.dtype != np.uint8:
+            raise ValueError(
+                f"Invalid patch shard {shard_path}: expected uint8 5D array, "
+                f"got shape={data.shape}, dtype={data.dtype}."
+            )
 
         if len(self._cache_keys_lru) >= self.max_cached_shards:
             oldest = self._cache_keys_lru.pop(0)
@@ -156,7 +246,12 @@ class ShardedPatchDataset(Dataset):
         shard_name = row["shard_name"]
         index_in_shard = int(row["index_in_shard"])
 
-        shard_data = self._load_shard(shard_name)
+        shard_data = self._load_shard(str(shard_name))
+        if index_in_shard < 0 or index_in_shard >= len(shard_data):
+            raise IndexError(
+                f"Manifest row {idx} references index {index_in_shard} in {shard_name}, "
+                f"but shard length is {len(shard_data)}."
+            )
         patch_uint8 = np.array(shard_data[index_in_shard])  # Shape (C, P, P, P)
 
         # Scale uint8 to float32 [0.0, 1.0]
