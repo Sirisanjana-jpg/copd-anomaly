@@ -381,7 +381,11 @@ def main() -> None:
         default=None,
         help="Optional capped real-data smoke run",
     )
-    parser.add_argument("--segment-lobes", action="store_true", help="Use TotalSegmentator five-lobe masks (requires the segmentation extra).")
+    parser.add_argument(
+        "--segment-lobes",
+        action="store_true",
+        help="Use TotalSegmentator five-lobe masks (requires the segmentation extra).",
+    )
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
     try:
