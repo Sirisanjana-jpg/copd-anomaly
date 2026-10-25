@@ -33,8 +33,7 @@ def _attach_training_file_log(log_path: Path) -> None:
     logger = logging.getLogger("train_encoder")
     resolved_path = str(log_path.resolve())
     if any(
-        isinstance(handler, logging.FileHandler)
-        and handler.baseFilename == resolved_path
+        isinstance(handler, logging.FileHandler) and handler.baseFilename == resolved_path
         for handler in logger.handlers
     ):
         return
@@ -86,9 +85,7 @@ def train_contrastive_encoder(
     if temperature <= 0 or not torch.isfinite(torch.tensor(temperature)):
         raise ValueError(f"temperature must be finite and positive, got {temperature}.")
     if checkpoint_every_steps < 1:
-        raise ValueError(
-            f"checkpoint_every_steps must be >= 1, got {checkpoint_every_steps}."
-        )
+        raise ValueError(f"checkpoint_every_steps must be >= 1, got {checkpoint_every_steps}.")
     path_parts = {part.lower() for part in checkpoint_dir.parts}
     if dry_run and "real" in path_parts:
         raise ValueError(
@@ -281,9 +278,7 @@ def train_contrastive_encoder(
                 np.random.set_state(rng_state["numpy"])
                 torch.set_rng_state(rng_state["torch_cpu"].cpu())
                 if device_obj.type == "cuda" and rng_state.get("torch_cuda"):
-                    torch.cuda.set_rng_state_all(
-                        [state.cpu() for state in rng_state["torch_cuda"]]
-                    )
+                    torch.cuda.set_rng_state_all([state.cpu() for state in rng_state["torch_cuda"]])
             else:
                 logger.warning(
                     "Resume checkpoint has no saved RNG state; continuing with the configured seed."
@@ -360,7 +355,9 @@ def train_contrastive_encoder(
                 drop_last=True,
                 generator=epoch_generator,
             )
-            resume_this_epoch = epoch == start_epoch and not resume_epoch_complete and start_batch > 0
+            resume_this_epoch = (
+                epoch == start_epoch and not resume_epoch_complete and start_batch > 0
+            )
             total_loss = resume_running_loss if resume_this_epoch else 0.0
             n_batches = resume_running_batches if resume_this_epoch else 0
 
@@ -415,9 +412,7 @@ def train_contrastive_encoder(
                         running_loss=total_loss,
                         running_batches=n_batches,
                     )
-                    _atomic_torch_save(
-                        partial_payload, checkpoint_dir / "encoder_latest.pt"
-                    )
+                    _atomic_torch_save(partial_payload, checkpoint_dir / "encoder_latest.pt")
                     logger.info(
                         "Saved recovery checkpoint at epoch %d/%d batch %d/%d.",
                         epoch + 1,
