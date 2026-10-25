@@ -42,13 +42,17 @@ def run_lobe_analysis(
         scores_df = pd.read_csv(patch_scores_path)
         required = {
             "patch_id", "patient_id", "scan_id", "lobe_id", "lung_fraction",
-            "volume_weight", "laa950_fraction", "anomaly_score",
+            "volume_weight", "laa950_fraction", "anomaly_score", "data_status",
         }
         missing = required - set(scores_df.columns)
         if missing:
             raise ValueError(f"Patch-score table is missing required columns: {sorted(missing)}.")
         if scores_df.empty:
             raise ValueError("Patch-score table is empty; no lobe report was written.")
+        if not scores_df["data_status"].astype(str).eq(
+            "REAL_CT_PATCH_INFERENCE_UNVALIDATED"
+        ).all():
+            raise ValueError("Patch-score table provenance is not a verified real-inference output.")
         if scores_df["patch_id"].astype(str).duplicated().any():
             raise ValueError("Patch-score table contains duplicate patch IDs.")
         score_values = pd.to_numeric(scores_df["anomaly_score"], errors="coerce").to_numpy(float)
