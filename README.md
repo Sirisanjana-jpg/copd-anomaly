@@ -1,4 +1,4 @@
-# COPD-Anomaly: Deep Anomaly-Based Assessment of Chest CT & Lobe-Wise Exacerbation Risk
+# COPD-Anomaly: CT Anomaly Quantification and Five-Lobe Analysis
 
 [![CI](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml)
 [![Python 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
@@ -11,7 +11,7 @@ A modular, reproducible implementation and extension of the self-supervised anom
 ## 1. Scope & Research Objective
 
 - **Base Method Reproduction**: Self-supervised 3D contrastive learning ($50 \times 50 \times 50$ lung parenchyma patches) trained on disease-unlabeled CT scans $\to$ latent space density modeling on normal controls $\to$ patch anomaly score $s(x) = -\log p(f(x))$ $\to$ subject-level aggregation $S(X)$.
-- **Extension Research Question**: Do **lobe-wise anomaly features** derived from CT add incremental predictive value for **12-month exacerbation risk** beyond clinical variables and a global anomaly score?
+- **Publication question**: Does five-lobe analysis of CT patch anomaly scores provide useful spatially resolved characterization beyond whole-lung summaries?
 - **Modality Scope**: Chest computed tomography (inspiratory $\pm$ registered expiratory) + clinical parameters.
 - **Strict Exclusions**: Chest X-ray, MRI, and any other imaging modality.
 
@@ -19,7 +19,7 @@ A modular, reproducible implementation and extension of the self-supervised anom
 > **Data Scope & Honest Reporting Boundaries**:
 > - The available 10 DIR-Lab cases have **no clinical tables, no spirometry, no healthy controls, and no exacerbation labels**. They are used exclusively for physical registration evaluation (TRE), parametric response mapping (PRM), and qualitative anomaly visualizations.
 > - CT-RATE labels are **report-derived text proxies**, not spirometry-confirmed COPD. Real-data AUC is reported strictly as a **REPORT-LABEL PROXY**, never as clinical COPD classification.
-> - Exacerbation risk heads, multimodal fusion, and hypothesis tests (likelihood-ratio test, conformal intervals) are evaluated on a **synthetic cohort** with a documented planted effect, with mandatory banners on all outputs.
+> - Exacerbation prediction and multimodal fusion are outside the current imaging paper scope. Synthetic experiments are software tests only and are not scientific evidence.
 
 ---
 
@@ -129,7 +129,7 @@ Cloud execution is supported through the same path-based scripts on **Google Col
 
 Use the repository's resumable streaming CLI to prepare patient-disjoint CT-RATE patch shards, then train on the training split only. See [`docs/REAL_TRAINING_RUNBOOK.md`](docs/REAL_TRAINING_RUNBOOK.md) for the gated-access setup, one-volume smoke run, split outputs, resumable training commands, and current limitations.
 
-The streaming CLI uses threshold lung segmentation as a provisional baseline; inspect the masks and patch counts before a long GPU run. Real patient-level anomaly scoring and held-out evaluation are not yet implemented end-to-end. Do not treat successful pretraining or density fitting as evidence of diagnostic performance.
+The streaming CLI can produce global-only patches with provisional threshold lung masks, or five-lobe patches with the optional TotalSegmentator backend. Real patch/scan/patient anomaly-scoring code is present but has not yet been validated on a real cohort. Follow `docs/PUBLICATION_SCOPE.md` and `docs/REAL_TRAINING_RUNBOOK.md`; successful pretraining alone is not evidence of scientific performance.
 
 ---
 
@@ -142,7 +142,7 @@ The streaming CLI uses threshold lung segmentation as a provisional baseline; in
 | **M3: DIR-Lab Registration** | Pending | Target: TRE $< 1.5$ mm | Observer noise floor: $\approx 0.65 - 1.06$ mm |
 | **M5: CT-RATE Lean Subset** | Pending | 200 volumes selected | Streamed without local persistence |
 | **M6: 3D Contrastive Encoder**| Pending | Not yet run | NT-Xent on `ctrate_train` |
-| **M7: Proxy Emphysema AUC** | Pending | Baseline %LAA vs Anomaly | Bannered: `REPORT-LABEL PROXY` |
+| **M7: Held-out anomaly evaluation** | Not yet validated | Whole-lung vs five-lobe scores and imaging baselines; report-label proxy is optional secondary analysis only |
 | **M9: 5-Model Ablation (Synthetic)**| Pending | LRT p-value | Validates planted effect |
 
 *All results will be logged in `PROGRESS.md` as milestones are completed.*
