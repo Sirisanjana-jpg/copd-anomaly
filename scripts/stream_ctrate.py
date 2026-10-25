@@ -4,6 +4,7 @@ Resumable CT-RATE streaming and patch-shard preparation.
 This command requires approved CT-RATE access and metadata CSVs. It stores only
 patch shards/manifests and logs; raw downloaded volumes are deleted by CTRATEStreamer.
 """
+
 from __future__ import annotations
 
 import argparse
