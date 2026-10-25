@@ -107,7 +107,12 @@ def extract_and_shard_patches(
                     f"CT shape={vol_insp.shape}. Re-run segmentation on the exact CT grid."
                 )
             lobe_mask = validate_lobe_mask(lobe_values, expected_shape=vol_insp.shape)
-            outside_fraction = float(np.mean((lobe_mask > 0) & (mask == 0)))
+            lobe_voxels = int(np.count_nonzero(lobe_mask))
+            outside_fraction = (
+                float(np.count_nonzero((lobe_mask > 0) & (mask == 0))) / lobe_voxels
+                if lobe_voxels
+                else 1.0
+            )
             if outside_fraction > 0.01:
                 raise ValueError(
                     f"Lobe mask for {scan_id} extends outside the lung mask in "
