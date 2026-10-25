@@ -7,8 +7,8 @@ for millions of 3D thoracic CT patches without RAM exhaustion.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +41,7 @@ class ShardedPatchWriter:
         self.current_shard_idx = 0
         self.buffer_patches: list[np.ndarray] = []
         self.buffer_records: list[dict[str, Any]] = []
+        self._patch_shape: tuple[int, ...] | None = None
         self.all_manifest_records: list[dict[str, Any]] = []
 
     def add_patches(self, patches: np.ndarray, records: list[PatchRecord]) -> None:
@@ -62,6 +63,11 @@ class ShardedPatchWriter:
         if len(patches) == 0:
             return
         patch_shape = tuple(patches.shape[1:])
+        if self._patch_shape is not None and patch_shape != self._patch_shape:
+            raise ValueError(
+                f"Patch shape changed within this shard set: {patch_shape} != {self._patch_shape}."
+            )
+        self._patch_shape = patch_shape
         for i in range(len(patches)):
             if tuple(patches[i].shape) != patch_shape:
                 raise ValueError(f"Inconsistent patch shape at index {i}: {patches[i].shape}.")
@@ -191,14 +197,26 @@ class ShardedPatchDataset(Dataset):
             raise ValueError("Patch manifest contains missing shard references.")
         if (self.manifest["index_in_shard"].astype(int) < 0).any():
             raise ValueError("Patch manifest contains negative index_in_shard values.")
+        shard_names = self.manifest["shard_name"].astype(str).unique()
+        unsafe_names = [
+            name for name in shard_names if Path(name).name != name or not name.endswith(".npy")
+        ]
+        if unsafe_names:
+            raise ValueError(
+                f"Patch manifest contains unsafe shard paths: {unsafe_names[:10]}."
+            )
         missing_shards = sorted(
-            name for name in self.manifest["shard_name"].astype(str).unique()
-            if not (self.dataset_dir / name).is_file()
+            name for name in shard_names if not (self.dataset_dir / name).is_file()
         )
         if missing_shards:
             raise FileNotFoundError(
                 f"Patch manifest references missing shard files: {missing_shards[:10]}."
             )
+        if self.manifest["patch_id"].astype(str).duplicated().any():
+            raise ValueError("Patch manifest contains duplicate patch_id values.")
+        if self.manifest.duplicated(subset=["shard_name", "index_in_shard"]).any():
+            raise ValueError("Multiple manifest rows point to the same patch in a shard.")
+        self._validate_shard_references()
         if normal_only and "laa950_fraction" in self.manifest.columns:
             self.manifest = self.manifest[
                 self.manifest["laa950_fraction"] <= normal_emphysema_cap
@@ -211,6 +229,28 @@ class ShardedPatchDataset(Dataset):
         self.max_cached_shards = max_cached_shards
         self._shard_cache: dict[str, np.ndarray] = {}
         self._cache_keys_lru: list[str] = []
+
+    def _validate_shard_references(self) -> None:
+        """Validate shard headers and manifest indices without loading patch arrays into RAM."""
+        for shard_name, rows in self.manifest.groupby("shard_name", sort=False):
+            shard_path = self.dataset_dir / str(shard_name)
+            try:
+                shard = np.load(shard_path, mmap_mode="r", allow_pickle=False)
+            except Exception as exc:
+                raise IOError(f"Cannot read patch shard {shard_path}: {exc}") from exc
+            if shard.ndim != 5 or shard.dtype != np.uint8:
+                raise ValueError(
+                    f"Invalid patch shard {shard_path}: expected uint8 5D array, "
+                    f"got shape={shard.shape}, dtype={shard.dtype}."
+                )
+            indices = rows["index_in_shard"].astype(int)
+            if indices.max() >= len(shard):
+                raise IndexError(
+                    f"Manifest references index {indices.max()} in {shard_path}, "
+                    f"but shard contains only {len(shard)} patches."
+                )
+            if indices.min() < 0:
+                raise IndexError(f"Manifest contains a negative index for {shard_path}.")
 
     def __len__(self) -> int:
         return len(self.manifest)
