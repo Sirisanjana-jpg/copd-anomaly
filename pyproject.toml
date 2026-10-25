@@ -82,6 +82,7 @@ known-first-party = ["copd_anomaly"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 addopts = "-v --strict-markers"
 env = [
     "OPENBLAS_NUM_THREADS=1",
