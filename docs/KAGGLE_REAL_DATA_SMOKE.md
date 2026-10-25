@@ -27,7 +27,10 @@ print("Python:", sys.version)
 print("CUDA available:", torch.cuda.is_available())
 print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NONE")
 print("Disk free GiB:", round(shutil.disk_usage("/kaggle/working").free / 1024**3, 2))
-print("Kaggle inputs:", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "missing")
+print(
+    "Kaggle inputs:",
+    os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "missing",
+)
 ```
 
 Stop if CUDA is required for training but unavailable. The first data-stream smoke test can run on CPU if it fits within the session's resources; do not start a long encoder run yet.
