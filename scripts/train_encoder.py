@@ -1,14 +1,15 @@
 """
 Train a 3D ResNet contrastive encoder using real patch shards.
 
-Synthetic five-step training is available only with explicit --dry-run and is never
-presented as a research checkpoint.
+Real training writes a best checkpoint, an epoch-by-epoch resumable checkpoint, and
+CSV loss history. Synthetic five-step training is explicit and is never a research checkpoint.
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
@@ -31,6 +32,7 @@ def train_contrastive_encoder(
     dry_run: bool = False,
     device: str = "auto",
     seed: int = 42,
+    resume_from: Path | None = None,
 ) -> Path:
     if epochs < 1 or batch_size < 2:
         raise ValueError("epochs must be >= 1 and batch_size must be >= 2 for NT-Xent.")
@@ -38,13 +40,15 @@ def train_contrastive_encoder(
         if shards_dir is None:
             raise ValueError("Real training requires --shards-dir; use --dry-run only for a smoke test.")
         manifest = shards_dir / "patch_manifest.parquet"
-        if not manifest.is_file():
+        if not manifest.is_file() and not (shards_dir / "patch_manifest.csv").is_file():
             raise FileNotFoundError(
-                f"Patch manifest not found: {manifest}. Build real patches first, or pass --dry-run "
-                "for a synthetic smoke test. No checkpoint was written."
+                f"Patch manifest not found under {shards_dir}. Build real patches first, or pass "
+                "--dry-run for a synthetic smoke test. No checkpoint was written."
             )
         if checkpoint_dir == Path("outputs/checkpoints"):
             checkpoint_dir = Path("outputs/real/checkpoints")
+        if resume_from is not None and not resume_from.is_file():
+            raise FileNotFoundError(f"Resume checkpoint not found: {resume_from}")
     elif checkpoint_dir == Path("outputs/checkpoints"):
         checkpoint_dir = Path("outputs/synthetic/checkpoints")
 
@@ -65,8 +69,14 @@ def train_contrastive_encoder(
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     dual_transform = ContrastiveDualViewTransform()
     trained_steps = 0
+    history: list[dict[str, float | int]] = []
+    start_epoch = 0
+    best_loss = float("inf")
+    scheduler = None
 
     if dry_run:
+        if resume_from is not None:
+            raise ValueError("Resume is supported for real training only.")
         logger.warning(
             "SYNTHETIC DRY RUN ONLY: five random-input steps. This checkpoint is not a trained "
             "research model and must not be used for scientific results."
@@ -95,10 +105,31 @@ def train_contrastive_encoder(
         if len(loader) == 0:
             raise ValueError("No complete training batches are available; no checkpoint was written.")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-        best_loss = float("inf")
-        best_state = None
 
-        for epoch in range(epochs):
+        if resume_from is not None:
+            checkpoint = torch.load(resume_from, map_location=device_obj, weights_only=False)
+            if checkpoint.get("training_mode") != "real_patch_training":
+                raise ValueError("Refusing to resume from a synthetic or unverified checkpoint.")
+            required = {"model_state_dict", "optimizer_state_dict", "scheduler_state_dict", "epoch"}
+            missing = required - checkpoint.keys()
+            if missing:
+                raise ValueError(f"Resume checkpoint is incomplete; missing: {sorted(missing)}")
+            model.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            start_epoch = int(checkpoint["epoch"]) + 1
+            best_loss = float(checkpoint.get("best_loss", float("inf")))
+            trained_steps = int(checkpoint.get("trained_steps", 0))
+            history = list(checkpoint.get("history", []))
+            logger.info("Resuming at epoch %d from %s", start_epoch + 1, resume_from)
+            if start_epoch >= epochs:
+                best_path = checkpoint_dir / "encoder_best.pt"
+                if best_path.is_file():
+                    logger.info("Requested epochs already completed; returning %s", best_path)
+                    return best_path
+                raise ValueError("Resume checkpoint is already at requested epochs but best checkpoint is missing.")
+
+        for epoch in range(start_epoch, epochs):
             model.train()
             total_loss = 0.0
             n_batches = 0
@@ -119,30 +150,61 @@ def train_contrastive_encoder(
                 raise RuntimeError("Training produced zero batches; no checkpoint was written.")
             avg_loss = total_loss / n_batches
             scheduler.step()
+            history.append({"epoch": epoch + 1, "train_contrastive_loss": avg_loss, "batches": n_batches})
             logger.info("Epoch %d/%d - contrastive loss %.5f", epoch + 1, epochs, avg_loss)
+
+            payload = {
+                "model_state_dict": model.state_dict(),
+                "embedding_dim": model.embedding_dim,
+                "projection_dim": model.projection_dim,
+                "in_channels": model.in_channels,
+                "training_mode": "real_patch_training",
+                "trained_steps": trained_steps,
+                "epochs_requested": epochs,
+                "epoch": epoch,
+                "best_loss": best_loss,
+                "seed": seed,
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "history": history,
+                "config": {
+                    "shards_dir": str(shards_dir),
+                    "batch_size": batch_size,
+                    "learning_rate": lr,
+                    "temperature": temperature,
+                    "seed": seed,
+                    "device": str(device_obj),
+                },
+            }
             if avg_loss < best_loss:
                 best_loss = avg_loss
-                best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+                payload["best_loss"] = best_loss
+                torch.save(payload, checkpoint_dir / "encoder_best.pt")
+            torch.save(payload, checkpoint_dir / "encoder_latest.pt")
+            pd.DataFrame(history).to_csv(checkpoint_dir / "training_history.csv", index=False)
 
-        if best_state is None:
-            raise RuntimeError("Training did not produce a valid model state.")
-        model.load_state_dict(best_state)
+    if dry_run:
+        save_path = checkpoint_dir / "encoder_smoke_test.pt"
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "embedding_dim": model.embedding_dim,
+                "projection_dim": model.projection_dim,
+                "in_channels": model.in_channels,
+                "training_mode": "synthetic_dry_run",
+                "trained_steps": trained_steps,
+                "epochs_requested": 0,
+                "seed": seed,
+            },
+            save_path,
+        )
+        logger.info("Saved synthetic smoke-test checkpoint to %s", save_path)
+        return save_path
 
-    save_path = checkpoint_dir / "encoder_smoke_test.pt" if dry_run else checkpoint_dir / "encoder_best.pt"
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "embedding_dim": model.embedding_dim,
-            "projection_dim": model.projection_dim,
-            "in_channels": model.in_channels,
-            "training_mode": "synthetic_dry_run" if dry_run else "real_patch_training",
-            "trained_steps": trained_steps,
-            "epochs_requested": epochs if not dry_run else 0,
-            "seed": seed,
-        },
-        save_path,
-    )
-    logger.info("Saved %s checkpoint to %s", "synthetic smoke-test" if dry_run else "real training", save_path)
+    save_path = checkpoint_dir / "encoder_best.pt"
+    if not save_path.is_file():
+        raise RuntimeError(f"Training ended without a best checkpoint: {save_path}")
+    logger.info("Saved best real-training checkpoint to %s", save_path)
     return save_path
 
 
@@ -156,6 +218,7 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or another torch device string")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--resume-from", type=Path, default=None, help="Resume real training from encoder_latest.pt")
     parser.add_argument("--dry-run", action="store_true", help="Run five synthetic steps; not research training")
     args = parser.parse_args()
     train_contrastive_encoder(
@@ -168,6 +231,7 @@ def main() -> None:
         dry_run=args.dry_run,
         device=args.device,
         seed=args.seed,
+        resume_from=args.resume_from,
     )
 
 
