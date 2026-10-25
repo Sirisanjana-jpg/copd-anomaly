@@ -10,9 +10,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import random
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -240,6 +242,19 @@ def train_contrastive_encoder(
             best_loss = float(checkpoint.get("best_loss", float("inf")))
             trained_steps = int(checkpoint.get("trained_steps", 0))
             history = list(checkpoint.get("history", []))
+            rng_state = checkpoint.get("rng_state")
+            if rng_state:
+                random.setstate(rng_state["python"])
+                np.random.set_state(rng_state["numpy"])
+                torch.set_rng_state(rng_state["torch_cpu"].cpu())
+                if device_obj.type == "cuda" and rng_state.get("torch_cuda"):
+                    torch.cuda.set_rng_state_all(
+                        [state.cpu() for state in rng_state["torch_cuda"]]
+                    )
+            else:
+                logger.warning(
+                    "Resume checkpoint has no saved RNG state; continuing with the configured seed."
+                )
             logger.info("Resuming at epoch %d from %s", start_epoch + 1, resume_from)
             if start_epoch >= epochs:
                 best_path = checkpoint_dir / "encoder_best.pt"
@@ -328,6 +343,14 @@ def train_contrastive_encoder(
                 "seed": seed,
                 "optimizer_state_dict": optimizer.state_dict(),
                 "scheduler_state_dict": scheduler.state_dict(),
+                "rng_state": {
+                    "python": random.getstate(),
+                    "numpy": np.random.get_state(),
+                    "torch_cpu": torch.get_rng_state(),
+                    "torch_cuda": torch.cuda.get_rng_state_all()
+                    if device_obj.type == "cuda"
+                    else None,
+                },
                 "history": history,
                 "config": {
                     "shards_dir": str(shards_dir),
