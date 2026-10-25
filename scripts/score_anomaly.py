@@ -164,7 +164,11 @@ def score_real_patches(
         raise ValueError("Density model returned invalid anomaly scores.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    split_name = shards_dir.name.lower()
+    if split_name not in {"train", "val", "test"}:
+        logger.warning("Shard directory name %r is not train/val/test; evaluation must reject this split.", split_name)
     patch_scores = dataset.manifest.copy().reset_index(drop=True)
+    patch_scores["split"] = split_name
     patch_scores["anomaly_score"] = scores.astype(float)
     patch_scores["data_status"] = "REAL_CT_PATCH_INFERENCE_UNVALIDATED"
     patch_path = output_dir / "patch_anomaly_scores.csv"
@@ -181,6 +185,7 @@ def score_real_patches(
         row = {
             "patient_id": str(patient_id),
             "scan_id": str(scan_id),
+            "split": split_name,
             "patch_count": int(len(group)),
             "anomaly_mean": float(group["anomaly_score"].mean()),
             "anomaly_p90": float(group["anomaly_score"].quantile(0.90)),
@@ -199,6 +204,7 @@ def score_real_patches(
     patient_scores = (
         scan_scores.groupby("patient_id", as_index=False)
         .agg(
+            split=("split", "first"),
             scan_count=("scan_id", "nunique"),
             patch_count=("patch_count", "sum"),
             anomaly_mean=("anomaly_mean", "mean"),
