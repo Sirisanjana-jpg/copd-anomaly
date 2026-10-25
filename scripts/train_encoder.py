@@ -36,7 +36,7 @@ def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
             os.fsync(handle.fileno())
         check = torch.load(temporary, map_location="cpu", weights_only=False)
         if not isinstance(check, dict) or "training_mode" not in check:
-            raise IOError(f"Checkpoint verification failed for {destination}.")
+            raise OSError(f"Checkpoint verification failed for {destination}.")
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
@@ -328,7 +328,7 @@ def train_contrastive_encoder(
                 # Read back the staged history to detect truncated or malformed writes.
                 verified_history = pd.read_csv(history_tmp)
                 if len(verified_history) != len(history):
-                    raise IOError(
+                    raise OSError(
                         f"Training history verification failed: {len(verified_history)} rows "
                         f"for {len(history)} epochs."
                     )
