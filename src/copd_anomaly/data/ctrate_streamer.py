@@ -75,7 +75,18 @@ def create_tiered_splits(
     seed: int = 42,
 ) -> dict[str, pd.DataFrame]:
     """Constructs patient-disjoint train, val, and test subsets by configuration tier."""
-    tier_cfg = TIERS.get(tier, TIERS["lean"])
+    if tier not in TIERS:
+        raise ValueError(f"Unknown CT-RATE tier {tier!r}; choose one of {sorted(TIERS)}.")
+    for name, frame in (("train", train_metadata), ("valid", valid_metadata)):
+        if "VolumeName" not in frame.columns:
+            raise ValueError(f"{name} metadata must contain a 'VolumeName' column.")
+        if frame.empty:
+            raise ValueError(f"{name} metadata is empty.")
+        if frame["VolumeName"].isna().any() or (frame["VolumeName"].astype(str).str.strip() == "").any():
+            raise ValueError(f"{name} metadata contains empty VolumeName values.")
+        if frame["VolumeName"].astype(str).duplicated().any():
+            raise ValueError(f"{name} metadata contains duplicate VolumeName entries.")
+    tier_cfg = TIERS[tier]
     n_train = tier_cfg["train"]
     n_val = tier_cfg["val"]
     n_test = tier_cfg["test"]
@@ -168,13 +179,28 @@ class CTRATEStreamer:
         """Streams a single scan and extracts patches while enforcing cleanup."""
         token = os.environ.get("HF_TOKEN") or os.environ.get("HF_READ")
         downloaded_path: Path | None = None
+        stage = "validate_remote_path"
 
         try:
             from huggingface_hub import hf_hub_download
 
-            logger.info(f"Downloading {volume_name} from {self.repo_id}...")
-            subfolder = "train" if "train" in volume_name else "valid"
-            remote_path = f"dataset/{subfolder}/{volume_name}"
+            basename = Path(volume_name).name
+            if basename != volume_name or not basename.endswith(".nii.gz"):
+                raise ValueError(
+                    f"VolumeName must be a plain .nii.gz filename, got {volume_name!r}."
+                )
+            if basename.startswith("train_"):
+                subfolder = "train"
+            elif basename.startswith("valid_"):
+                subfolder = "valid"
+            else:
+                raise ValueError(
+                    f"Cannot determine CT-RATE split from filename {basename!r}; "
+                    "expected train_* or valid_*."
+                )
+            stage = "download"
+            logger.info("Downloading %s from %s...", volume_name, self.repo_id)
+            remote_path = f"dataset/{subfolder}/{basename}"
 
             local_file = hf_hub_download(
                 repo_id=self.repo_id,
@@ -184,6 +210,7 @@ class CTRATEStreamer:
                 local_dir=self.temp_dir,
             )
             downloaded_path = Path(local_file)
+            stage = "load_and_resample"
 
             # Normalize orientation before resampling to an isotropic 1 mm grid.
             # Interpolation is linear for intensities; segmentation is derived after resampling.
@@ -209,7 +236,15 @@ class CTRATEStreamer:
             vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
             spacing_zyx = (1.0, 1.0, 1.0)
 
+            stage = "segmentation"
             mask = self.segmenter.segment(vol_zyx, spacing_zyx)
+            if mask.shape != vol_zyx.shape:
+                raise ValueError(
+                    f"Mask shape {mask.shape} does not match CT shape {vol_zyx.shape}."
+                )
+            if not np.isfinite(mask).all() or not np.any(mask > 0):
+                raise ValueError("Lung segmentation returned an empty or non-finite mask.")
+            stage = "patch_extraction"
             patches, records = self.sampler.extract_patches(
                 volume_insp=vol_zyx,
                 volume_exp=None,
@@ -219,14 +254,28 @@ class CTRATEStreamer:
                 scan_id=volume_name.split(".")[0],
             )
 
-            if len(records) > 0:
-                writer.add_patches(patches, records)
+            if len(records) == 0:
+                logger.warning(
+                    "%s: patch extraction returned zero patches; check mask coverage and sampler thresholds.",
+                    volume_name,
+                )
+                return 0
+            stage = "write_shards"
+            writer.add_patches(patches, records)
                 logger.info(f"Successfully processed {volume_name}: {len(records)} patches saved.")
             return len(records)
 
         except Exception as exc:
-            logger.error(f"Failed to process remote volume {volume_name}: {exc}")
-            raise RuntimeError(f"Failed to process remote volume {volume_name}") from exc
+            logger.exception(
+                "CT-RATE volume failed: volume=%s stage=%s exception=%s",
+                volume_name,
+                stage,
+                type(exc).__name__,
+            )
+            raise RuntimeError(
+                f"CT-RATE volume {volume_name!r} failed at stage={stage} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
 
         finally:
             if downloaded_path and downloaded_path.exists():
