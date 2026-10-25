@@ -205,15 +205,20 @@ class SimpleITKRegistrar(Registrar):
         spacing_zyx: tuple[float, float, float] = (1.0, 1.0, 1.0),
     ) -> np.ndarray:
         """
-        Transforms moving landmark coordinates (x, y, z) into the fixed coordinate space.
+        Applies the fitted output-to-input transform: fixed/output coordinates to moving/input space.
+
+        SimpleITK registration returns the transform used by Resample. When registering
+        expiration (moving/input) to inspiration (fixed/output), this transform maps inhale
+        landmark coordinates into exhale space; compare those transformed points with expert
+        exhale landmarks for TRE.
 
         Args:
-            points: (N, 3) float32 coordinates as (x, y, z) in voxel space.
-            transform: Fitted SimpleITK transform.
+            points: (N, 3) float32 coordinates as (x, y, z) in voxel-index space.
+            transform: Fitted SimpleITK output-to-input transform.
             spacing_zyx: (sz, sy, sx) in mm.
 
         Returns:
-            warped_points: (N, 3) float32 coordinates in fixed voxel space.
+            Transformed coordinates in moving/input voxel-index space.
         """
         sz, sy, sx = spacing_zyx
         spacing_xyz = np.array([sx, sy, sz], dtype=np.float64)
