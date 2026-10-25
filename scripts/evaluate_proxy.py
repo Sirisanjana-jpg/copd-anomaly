@@ -43,9 +43,13 @@ def evaluate_report_label_proxy(
     score_required = {"patient_id", "split", "data_status", score_column}
     label_required = {"patient_id", "label"}
     if not score_required.issubset(scores.columns):
-        raise ValueError(f"Patient score table is missing columns: {sorted(score_required - set(scores.columns))}.")
+        raise ValueError(
+            f"Patient score table is missing columns: {sorted(score_required - set(scores.columns))}."
+        )
     if not label_required.issubset(labels.columns):
-        raise ValueError(f"Label table is missing columns: {sorted(label_required - set(labels.columns))}.")
+        raise ValueError(
+            f"Label table is missing columns: {sorted(label_required - set(labels.columns))}."
+        )
     if scores.empty or labels.empty:
         raise ValueError("Patient score and label tables must both be non-empty.")
     if scores["data_status"].astype(str).ne("REAL_CT_PATCH_INFERENCE_UNVALIDATED").any():
@@ -110,11 +114,19 @@ def evaluate_report_label_proxy(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate held-out CT-RATE report-label proxy metrics.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate held-out CT-RATE report-label proxy metrics."
+    )
     parser.add_argument("--patient-scores", type=Path, required=True)
-    parser.add_argument("--labels", type=Path, required=True, help="Reviewed CSV with patient_id,label[,split].")
-    parser.add_argument("--output", type=Path, default=Path("outputs/real/reports/report_label_proxy_metrics.json"))
-    parser.add_argument("--label-definition", required=True, help="Documented report-label rule/version.")
+    parser.add_argument(
+        "--labels", type=Path, required=True, help="Reviewed CSV with patient_id,label[,split]."
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("outputs/real/reports/report_label_proxy_metrics.json")
+    )
+    parser.add_argument(
+        "--label-definition", required=True, help="Documented report-label rule/version."
+    )
     parser.add_argument("--score-column", choices=sorted(ALLOWED_SCORES), default="anomaly_mean")
     parser.add_argument("--expected-split", choices=["test"], default="test")
     parser.add_argument("--bootstraps", type=int, default=500)
