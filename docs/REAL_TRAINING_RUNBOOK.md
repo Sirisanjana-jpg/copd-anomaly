@@ -58,14 +58,14 @@ Run the diagnostic script after the complete cohort has been streamed and review
 python scripts/diagnose_training.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --require-cuda --report outputs/real/preflight_report.json
 ```
 
-If using CPU intentionally, omit `--require-cuda`. Do not proceed if the report status is `failed`; inspect the listed errors first.
+If using CPU intentionally, omit `--require-cuda` from both the diagnostic and training commands. Do not proceed if the report status is `failed`; inspect the listed errors first. The training CLI also checks CUDA so it will not silently fall back to a slow CPU run.
 
 ## 4. Train the encoder
 
 Train only on the `train` shards, not the validation/test shards. Start with a short run to catch memory/shape issues; then choose the intended epoch count before a long run. A 3D encoder run may take many hours to days depending on GPU, patch count and I/O.
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25 --require-cuda
 ```
 
 The script detects whether patches have one input channel or paired channels and writes:
@@ -77,7 +77,7 @@ The script detects whether patches have one input channel or paired channels and
 If interrupted, resume using the **same total epoch count and training settings**. Recovery resumes from the latest saved batch checkpoint when available, so a crash should lose at most the most recent checkpoint interval of work. Keep `--checkpoint-every-steps` the same for consistent operational behavior:
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25 --resume-from outputs/real/checkpoints/encoder_latest.pt
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25 --require-cuda --resume-from outputs/real/checkpoints/encoder_latest.pt
 ```
 
 Use `--device cuda` only when CUDA is available. Reduce batch size if GPU memory is insufficient; keep batch size at least 2 for NT-Xent. Archive the code commit, selected patient IDs, shard manifests, environment/package versions, GPU model, seed and training history.
