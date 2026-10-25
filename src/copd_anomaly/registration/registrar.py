@@ -132,17 +132,17 @@ class SimpleITKRegistrar(Registrar):
         fixed_img = self._numpy_to_sitk(fixed_volume, spacing_zyx, origin_xyz, direction_xyz)
         moving_img = self._numpy_to_sitk(moving_volume, spacing_zyx, origin_xyz, direction_xyz)
 
-        # Resample moving image to match fixed geometry if shapes differ
+        # Do not silently resample an unregistered grid: that would invalidate landmark
+        # correspondence and the interpretation of the fitted transform.
         if fixed_volume.shape != moving_volume.shape:
-            logger.info("Resampling moving image grid to match fixed image shape...")
-            moving_img = sitk.Resample(
-                moving_img,
-                fixed_img,
-                sitk.Transform(),
-                sitk.sitkLinear,
-                -1024.0,
-                moving_img.GetPixelID(),
+            raise ValueError(
+                f"Registration requires matching array shapes, got fixed={fixed_volume.shape}, "
+                f"moving={moving_volume.shape}. Harmonize both images and landmarks explicitly first."
             )
+        if fixed_mask is not None and fixed_mask.shape != fixed_volume.shape:
+            raise ValueError("Fixed lung mask shape does not match the fixed CT volume.")
+        if moving_mask is not None and moving_mask.shape != moving_volume.shape:
+            raise ValueError("Moving lung mask shape does not match the moving CT volume.")
 
         # Set up registration method
         R = sitk.ImageRegistrationMethod()
