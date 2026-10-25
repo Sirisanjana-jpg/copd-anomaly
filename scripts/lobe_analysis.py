@@ -84,9 +84,11 @@ def run_lobe_analysis(
         for (patient_id, scan_id), group in scores_df.groupby(["patient_id", "scan_id"], sort=True):
             observed = set(pd.to_numeric(group["lobe_id"]).astype(int))
             if observed != {1, 2, 3, 4, 5}:
-                raise ValueError(
-                    f"Scan {scan_id} has patches in lobes {sorted(observed)}; all five labels "
-                    "must be represented before emitting a complete lobe-wise feature row."
+                logger.warning(
+                    "Scan %s has patch coverage only for lobes %s; missing-lobe features "
+                    "will remain NaN and must be considered in QC.",
+                    scan_id,
+                    sorted(observed),
                 )
             records = []
             for _, row in group.iterrows():
