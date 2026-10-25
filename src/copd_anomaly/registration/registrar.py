@@ -99,12 +99,21 @@ class SimpleITKRegistrar(Registrar):
         self.fast_mode = fast_mode
 
     def _numpy_to_sitk(
-        self, array_zyx: np.ndarray, spacing_zyx: tuple[float, float, float]
+        self,
+        array_zyx: np.ndarray,
+        spacing_zyx: tuple[float, float, float],
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> sitk.Image:
-        """Converts (Z, Y, X) numpy array to SimpleITK Image with spacing (sx, sy, sz)."""
+        """Converts (Z,Y,X) array to SimpleITK while preserving physical geometry."""
         image = sitk.GetImageFromArray(array_zyx)
         sz, sy, sx = spacing_zyx
         image.SetSpacing((float(sx), float(sy), float(sz)))
+        image.SetOrigin(tuple(float(value) for value in origin_xyz))
+        direction = np.asarray(direction_xyz, dtype=float).reshape(3, 3)
+        if not np.allclose(direction.T @ direction, np.eye(3), atol=1e-4):
+            raise ValueError("Image direction must be orthonormal; reorient/resample CT geometry first.")
+        image.SetDirection(tuple(direction.ravel()))
         return image
 
     def register(
@@ -114,12 +123,14 @@ class SimpleITKRegistrar(Registrar):
         fixed_mask: np.ndarray | None = None,
         moving_mask: np.ndarray | None = None,
         spacing_zyx: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> RegistrationResult:
         """
-        Registers moving (exhale) volume to fixed (inhale) volume.
+        Registers moving (exhale) volume to fixed (inhale) volume in physical image space.
         """
-        fixed_img = self._numpy_to_sitk(fixed_volume, spacing_zyx)
-        moving_img = self._numpy_to_sitk(moving_volume, spacing_zyx)
+        fixed_img = self._numpy_to_sitk(fixed_volume, spacing_zyx, origin_xyz, direction_xyz)
+        moving_img = self._numpy_to_sitk(moving_volume, spacing_zyx, origin_xyz, direction_xyz)
 
         # Resample moving image to match fixed geometry if shapes differ
         if fixed_volume.shape != moving_volume.shape:
@@ -138,7 +149,9 @@ class SimpleITKRegistrar(Registrar):
         R.SetMetricAsMeanSquares()
 
         if fixed_mask is not None and np.any(fixed_mask):
-            fixed_mask_img = self._numpy_to_sitk(fixed_mask.astype(np.uint8), spacing_zyx)
+            fixed_mask_img = self._numpy_to_sitk(
+                fixed_mask.astype(np.uint8), spacing_zyx, origin_xyz, direction_xyz
+            )
             R.SetMetricFixedMask(fixed_mask_img)
 
         R.SetMetricSamplingStrategy(R.RANDOM)
@@ -203,6 +216,8 @@ class SimpleITKRegistrar(Registrar):
         points: np.ndarray,
         transform: Any,
         spacing_zyx: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> np.ndarray:
         """
         Applies the fitted output-to-input transform: fixed/output coordinates to moving/input space.
@@ -222,13 +237,16 @@ class SimpleITKRegistrar(Registrar):
         """
         sz, sy, sx = spacing_zyx
         spacing_xyz = np.array([sx, sy, sz], dtype=np.float64)
+        origin = np.asarray(origin_xyz, dtype=np.float64)
+        direction = np.asarray(direction_xyz, dtype=np.float64).reshape(3, 3)
+        if not np.allclose(direction.T @ direction, np.eye(3), atol=1e-4):
+            raise ValueError("Image direction must be orthonormal for landmark transformation.")
 
         transformed = np.zeros_like(points, dtype=np.float32)
         for i in range(len(points)):
-            pt_voxel = points[i]
-            pt_phys = tuple(pt_voxel * spacing_xyz)
-            warped_phys = transform.TransformPoint(pt_phys)
-            warped_voxel = np.array(warped_phys, dtype=np.float64) / spacing_xyz
+            pt_phys = origin + direction @ (np.asarray(points[i], dtype=np.float64) * spacing_xyz)
+            warped_phys = np.asarray(transform.TransformPoint(tuple(pt_phys)), dtype=np.float64)
+            warped_voxel = (direction.T @ (warped_phys - origin)) / spacing_xyz
             transformed[i] = warped_voxel.astype(np.float32)
 
         return transformed
