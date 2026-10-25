@@ -65,19 +65,19 @@ If using CPU intentionally, omit `--require-cuda`. Do not proceed if the report 
 Train only on the `train` shards, not the validation/test shards. Start with a short run to catch memory/shape issues; then choose the intended epoch count before a long run. A 3D encoder run may take many hours to days depending on GPU, patch count and I/O.
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25
 ```
 
 The script detects whether patches have one input channel or paired channels and writes:
 - `outputs/real/checkpoints/encoder_best.pt` — best epoch by training contrastive loss
-- `outputs/real/checkpoints/encoder_latest.pt` — latest epoch, optimizer/scheduler state, and history for resuming
+- `outputs/real/checkpoints/encoder_latest.pt` — atomic recovery checkpoint, including optimizer/scheduler and RNG states; saved every 25 batches and at each completed epoch
 - `outputs/real/checkpoints/training_history.csv` — per-epoch loss, batch count, and elapsed seconds
 - `outputs/real/checkpoints/training.log` — persistent console output, failure traceback, and batch/scan context
 
-If interrupted, resume using the **same total epoch count and settings**:
+If interrupted, resume using the **same total epoch count and training settings**. Recovery resumes from the latest saved batch checkpoint when available, so a crash should lose at most the most recent checkpoint interval of work. Keep `--checkpoint-every-steps` the same for consistent operational behavior:
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --resume-from outputs/real/checkpoints/encoder_latest.pt
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --checkpoint-every-steps 25 --resume-from outputs/real/checkpoints/encoder_latest.pt
 ```
 
 Use `--device cuda` only when CUDA is available. Reduce batch size if GPU memory is insufficient; keep batch size at least 2 for NT-Xent. Archive the code commit, selected patient IDs, shard manifests, environment/package versions, GPU model, seed and training history.
