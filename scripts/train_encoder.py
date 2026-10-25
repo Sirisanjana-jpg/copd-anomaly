@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 import pandas as pd
 import torch
@@ -108,6 +108,15 @@ def train_contrastive_encoder(
                 "are required. No checkpoint was written."
             )
         sample_patch, _ = dataset[0]
+        if sample_patch.ndim != 4:
+            raise ValueError(
+                f"Expected a patch shaped (C, Z, Y, X), got {tuple(sample_patch.shape)}."
+            )
+        if len(set(sample_patch.shape[1:])) != 1 or min(sample_patch.shape[1:]) < 16:
+            raise ValueError(
+                f"Expected a cubic patch with each spatial dimension >= 16, "
+                f"got {tuple(sample_patch.shape)}."
+            )
         input_channels = int(sample_patch.shape[0])
         if input_channels not in (1, 2):
             raise ValueError(
