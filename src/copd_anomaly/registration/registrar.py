@@ -112,7 +112,9 @@ class SimpleITKRegistrar(Registrar):
         image.SetOrigin(tuple(float(value) for value in origin_xyz))
         direction = np.asarray(direction_xyz, dtype=float).reshape(3, 3)
         if not np.allclose(direction.T @ direction, np.eye(3), atol=1e-4):
-            raise ValueError("Image direction must be orthonormal; reorient/resample CT geometry first.")
+            raise ValueError(
+                "Image direction must be orthonormal; reorient/resample CT geometry first."
+            )
         image.SetDirection(tuple(direction.ravel()))
         return image
 
