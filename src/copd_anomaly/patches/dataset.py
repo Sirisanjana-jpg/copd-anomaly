@@ -185,8 +185,14 @@ class ShardedPatchDataset(Dataset):
                 "Check the patch manifest and streaming failure log."
             )
         required_columns = {
-            "patch_id", "patient_id", "scan_id", "shard_name", "index_in_shard",
-            "lobe_id", "lung_fraction", "laa950_fraction",
+            "patch_id",
+            "patient_id",
+            "scan_id",
+            "shard_name",
+            "index_in_shard",
+            "lobe_id",
+            "lung_fraction",
+            "laa950_fraction",
         }
         missing_columns = required_columns - set(self.manifest.columns)
         if missing_columns:
@@ -208,9 +214,7 @@ class ShardedPatchDataset(Dataset):
             name for name in shard_names if Path(name).name != name or not name.endswith(".npy")
         ]
         if unsafe_names:
-            raise ValueError(
-                f"Patch manifest contains unsafe shard paths: {unsafe_names[:10]}."
-            )
+            raise ValueError(f"Patch manifest contains unsafe shard paths: {unsafe_names[:10]}.")
         missing_shards = sorted(
             name for name in shard_names if not (self.dataset_dir / name).is_file()
         )
@@ -223,7 +227,9 @@ class ShardedPatchDataset(Dataset):
                 dtype=np.float64
             )
             if not np.isfinite(numeric_values).all():
-                raise ValueError(f"Patch manifest column {column!r} contains non-numeric or non-finite values.")
+                raise ValueError(
+                    f"Patch manifest column {column!r} contains non-numeric or non-finite values."
+                )
         if not self.manifest["lung_fraction"].between(0.0, 1.0).all():
             raise ValueError("Patch manifest lung_fraction values must be within [0, 1].")
         if not self.manifest["laa950_fraction"].between(0.0, 1.0).all():
@@ -233,9 +239,10 @@ class ShardedPatchDataset(Dataset):
         lobe_values = pd.to_numeric(self.manifest["lobe_id"], errors="coerce").to_numpy(
             dtype=np.float64
         )
-        if not np.isfinite(lobe_values).all() or not np.equal(
-            lobe_values, np.floor(lobe_values)
-        ).all():
+        if (
+            not np.isfinite(lobe_values).all()
+            or not np.equal(lobe_values, np.floor(lobe_values)).all()
+        ):
             raise ValueError("Patch manifest contains missing or non-integer lobe IDs.")
         lobe_ids = set(lobe_values.astype(int))
         if not lobe_ids.issubset({-1, 1, 2, 3, 4, 5}):
