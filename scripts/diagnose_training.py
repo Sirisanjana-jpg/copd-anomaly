@@ -12,13 +12,22 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 
 from copd_anomaly.patches.dataset import ShardedPatchDataset
 from copd_anomaly.utils.helpers import get_logger
 
 logger = get_logger("diagnose_training")
+
+
+def _existing_parent(path: Path) -> Path:
+    """Return the closest existing parent for disk-usage checks on new output paths."""
+    candidate = path
+    while not candidate.exists():
+        if candidate.parent == candidate:
+            raise FileNotFoundError(f"No existing parent directory for {path}.")
+        candidate = candidate.parent
+    return candidate
 
 
 def diagnose_training_inputs(
@@ -58,7 +67,7 @@ def diagnose_training_inputs(
         report["gpu_memory_bytes"] = torch.cuda.get_device_properties(0).total_memory
 
     for path in (shards_dir, checkpoint_dir):
-        usage = shutil.disk_usage(path if path.exists() else path.parent.resolve())
+        usage = shutil.disk_usage(_existing_parent(path))
         free_gb = usage.free / (1024**3)
         report.setdefault("disk", {})[str(path)] = {
             "free_gb": round(free_gb, 2),
@@ -142,7 +151,7 @@ def main() -> int:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         temporary = args.report.with_name(f".{args.report.name}.tmp")
         try:
-            temporary.write_text(rendered + "\\n", encoding="utf-8")
+            temporary.write_text(rendered + "\n", encoding="utf-8")
             json.loads(temporary.read_text(encoding="utf-8"))
             os.replace(temporary, args.report)
         finally:
