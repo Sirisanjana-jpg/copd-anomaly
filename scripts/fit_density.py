@@ -34,7 +34,7 @@ def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
             os.fsync(handle.fileno())
         check = torch.load(temporary, map_location="cpu", weights_only=False)
         if not isinstance(check, dict) or "training_mode" not in check:
-            raise IOError(f"Density checkpoint verification failed for {destination}.")
+            raise OSError(f"Density checkpoint verification failed for {destination}.")
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
