@@ -32,9 +32,9 @@ Replace the two metadata paths with your real file locations. The smoke pass use
 The streamer canonicalizes image orientation, resamples intensities to a 1 mm isotropic grid, checks for non-finite and implausible non-HU intensity ranges, derives a threshold lung mask, extracts patches and writes per-split manifests. It logs failed volumes instead of silently counting them as successful. Inspect the masks and patch locations visually before scaling up. The current threshold mask is a baseline, not validated five-lobe segmentation; do not report lobe-wise findings from it.
 
 Outputs are stored in separate directories:
-- `data/processed/ctrate_smoke/ctrate_train/`
-- `data/processed/ctrate_smoke/ctrate_val/`
-- `data/processed/ctrate_smoke/ctrate_test/`
+- `data/processed/ctrate_smoke/train/`
+- `data/processed/ctrate_smoke/val/`
+- `data/processed/ctrate_smoke/test/`
 
 Each split contains `patch_manifest.parquet`, shard files, `selected_volumes.csv`, `selected_patient_ids.txt`, and `stream_log.csv`. Review `patch_counts.json`, `stream_config.json`, and all `failed` / `no_patches` log rows. The current code filters training density candidates by LAA-950 only; this is a heuristic, not the full CT-RATE report-negative normality definition described in the project plan.
 
@@ -52,10 +52,10 @@ The stream CLI saves manifests after each successfully processed scan and record
 
 ## 3. Train the encoder
 
-Train only on the `ctrate_train` shards, not the validation/test shards. Start with a short run to catch memory/shape issues; then choose the intended epoch count before a long run. A 3D encoder run may take many hours to days depending on GPU, patch count and I/O.
+Train only on the `train` shards, not the validation/test shards. Start with a short run to catch memory/shape issues; then choose the intended epoch count before a long run. A 3D encoder run may take many hours to days depending on GPU, patch count and I/O.
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/ctrate_train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto
 ```
 
 The script detects whether patches have one input channel or paired channels and writes:
@@ -66,7 +66,7 @@ The script detects whether patches have one input channel or paired channels and
 If interrupted, resume using the **same total epoch count and settings**:
 
 ```powershell
-python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/ctrate_train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --resume-from outputs/real/checkpoints/encoder_latest.pt
+python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --epochs 30 --batch-size 4 --lr 0.0001 --temperature 0.07 --device auto --resume-from outputs/real/checkpoints/encoder_latest.pt
 ```
 
 Use `--device cuda` only when CUDA is available. Reduce batch size if GPU memory is insufficient; keep batch size at least 2 for NT-Xent. Archive the code commit, selected patient IDs, shard manifests, environment/package versions, GPU model, seed and training history.
@@ -76,7 +76,7 @@ Use `--device cuda` only when CUDA is available. Reduce batch size if GPU memory
 Fit the density estimator only from eligible patches in the training split:
 
 ```powershell
-python scripts/fit_density.py --shards-dir data/processed/ctrate_lean/ctrate_train --encoder-ckpt outputs/real/checkpoints/encoder_best.pt --output-model outputs/real/checkpoints/density_model.joblib --model-type gmm --components 8
+python scripts/fit_density.py --shards-dir data/processed/ctrate_lean/train --encoder-ckpt outputs/real/checkpoints/encoder_best.pt --output-model outputs/real/checkpoints/density_model.joblib --model-type gmm --components 8
 ```
 
 Check how many patches pass the LAA-950 filter before interpreting the result. If too few eligible patches remain, do not silently loosen the threshold; document a scientifically justified selection rule and rerun with a fresh, versioned output.
