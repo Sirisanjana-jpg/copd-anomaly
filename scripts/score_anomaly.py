@@ -142,6 +142,11 @@ def score_real_patches(
     encoder.load_state_dict(checkpoint["model_state_dict"])
     encoder.eval()
     density = GaussianMixtureDensity.load(str(density_model_path))
+    if density.training_mode != "real_patch_training":
+        raise ValueError(
+            "Real inference requires a density model with explicit real_patch_training provenance. "
+            "Refit density from the real training split; legacy/unverified artifacts are rejected."
+        )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     embeddings = []
     with torch.no_grad():
