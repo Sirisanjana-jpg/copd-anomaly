@@ -106,7 +106,7 @@ class ShardedPatchWriter:
             # Re-open before publishing so a failed/partial write is never treated as a shard.
             check = np.load(temp_path, mmap_mode="r", allow_pickle=False)
             if check.shape != arr.shape or check.dtype != np.uint8:
-                raise IOError(
+                raise OSError(
                     f"Shard verification failed for {shard_name}: "
                     f"shape={check.shape}, dtype={check.dtype}."
                 )
@@ -139,7 +139,7 @@ class ShardedPatchWriter:
                 required = {"patch_id", "scan_id", "shard_name", "index_in_shard"}
                 missing = required - set(check.columns)
                 if missing or len(check) != len(df):
-                    raise IOError(
+                    raise OSError(
                         f"Manifest verification failed: missing={sorted(missing)}, "
                         f"rows={len(check)} expected={len(df)}."
                     )
@@ -244,7 +244,7 @@ class ShardedPatchDataset(Dataset):
             try:
                 shard = np.load(shard_path, mmap_mode="r", allow_pickle=False)
             except Exception as exc:
-                raise IOError(f"Cannot read patch shard {shard_path}: {exc}") from exc
+                raise OSError(f"Cannot read patch shard {shard_path}: {exc}") from exc
             if shard.ndim != 5 or shard.dtype != np.uint8:
                 raise ValueError(
                     f"Invalid patch shard {shard_path}: expected uint8 5D array, "
@@ -281,7 +281,7 @@ class ShardedPatchDataset(Dataset):
         try:
             data = np.load(shard_path, mmap_mode="r", allow_pickle=False)
         except Exception as exc:
-            raise IOError(f"Cannot read patch shard {shard_path}: {exc}") from exc
+            raise OSError(f"Cannot read patch shard {shard_path}: {exc}") from exc
         if data.ndim != 5 or data.dtype != np.uint8:
             raise ValueError(
                 f"Invalid patch shard {shard_path}: expected uint8 5D array, "
