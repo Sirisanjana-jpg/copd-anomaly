@@ -16,6 +16,7 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
+from nibabel.processing import resample_to_output
 import pandas as pd
 
 from copd_anomaly.patches.dataset import ShardedPatchWriter
@@ -184,11 +185,26 @@ class CTRATEStreamer:
             )
             downloaded_path = Path(local_file)
 
-            img = nib.load(str(downloaded_path))
-            vol_xyz = img.get_fdata().astype(np.float32)
+            # Normalize orientation before resampling to an isotropic 1 mm grid.
+            # Interpolation is linear for intensities; segmentation is derived after resampling.
+            img = nib.as_closest_canonical(nib.load(str(downloaded_path)))
+            img = resample_to_output(img, voxel_sizes=(1.0, 1.0, 1.0), order=1)
+            vol_xyz = img.get_fdata(dtype=np.float32)
+            if not np.isfinite(vol_xyz).all():
+                raise ValueError(f"Non-finite CT intensities found in {volume_name}.")
+            intensity_min = float(np.min(vol_xyz))
+            intensity_max = float(np.max(vol_xyz))
+            if intensity_min >= -200.0 or intensity_min < -5000.0 or intensity_max > 10000.0:
+                raise ValueError(
+                    f"Intensity range [{intensity_min:.1f}, {intensity_max:.1f}] for {volume_name} "
+                    "does not look like HU-scaled CT. Verify NIfTI rescale slope/intercept."
+                )
+            logger.info(
+                "%s: isotropic 1 mm grid shape=%s, intensity range=[%.1f, %.1f] HU",
+                volume_name, vol_xyz.shape, intensity_min, intensity_max,
+            )
             vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
-            zooms = img.header.get_zooms()[:3]
-            spacing_zyx = (float(zooms[2]), float(zooms[1]), float(zooms[0]))
+            spacing_zyx = (1.0, 1.0, 1.0)
 
             mask = self.segmenter.segment(vol_zyx, spacing_zyx)
             patches, records = self.sampler.extract_patches(
