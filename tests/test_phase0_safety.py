@@ -100,3 +100,25 @@ def test_synthetic_score_report_is_marked_and_separated(tmp_path: Path) -> None:
     assert report_path.exists()
     assert report["data_status"].str.contains("SYNTHETIC DRY RUN").all()
     assert report["metric_type"].str.contains("proxy", case=False).all()
+
+
+def test_synthetic_artifacts_cannot_be_written_under_real_outputs(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Synthetic dry-run checkpoints"):
+        train_contrastive_encoder(
+            shards_dir=tmp_path / "unused",
+            checkpoint_dir=tmp_path / "outputs" / "real" / "checkpoints",
+            dry_run=True,
+        )
+    with pytest.raises(ValueError, match="Synthetic density models"):
+        fit_density_estimator(
+            shards_dir=tmp_path / "unused",
+            encoder_ckpt=tmp_path / "unused.pt",
+            output_model_path=tmp_path / "outputs" / "real" / "density.joblib",
+            dry_run=True,
+        )
+    with pytest.raises(ValueError, match="Synthetic evaluation reports"):
+        score_and_evaluate(
+            density_model_path=tmp_path / "unused.joblib",
+            output_report_path=tmp_path / "outputs" / "real" / "proxy.csv",
+            dry_run=True,
+        )
