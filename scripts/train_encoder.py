@@ -232,6 +232,7 @@ def train_contrastive_encoder(
                 "learning_rate": lr,
                 "temperature": temperature,
                 "seed": seed,
+                "checkpoint_every_steps": checkpoint_every_steps,
             }
             saved_config = checkpoint.get("config", {})
             mismatches = {
