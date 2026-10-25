@@ -161,6 +161,7 @@ def score_real_patches(
     output_dir.mkdir(parents=True, exist_ok=True)
     patch_scores = dataset.manifest.copy().reset_index(drop=True)
     patch_scores["anomaly_score"] = scores.astype(float)
+    patch_scores["data_status"] = "REAL_CT_PATCH_INFERENCE_UNVALIDATED"
     patch_path = output_dir / "patch_anomaly_scores.csv"
     patch_tmp = patch_path.with_suffix(".csv.tmp")
     patch_scores.to_csv(patch_tmp, index=False)
