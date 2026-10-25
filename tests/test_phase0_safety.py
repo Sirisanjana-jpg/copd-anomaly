@@ -50,10 +50,11 @@ def test_real_scoring_does_not_emit_empty_report(tmp_path: Path) -> None:
 def test_lobe_analysis_refuses_to_fabricate_real_scores(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.parquet"
     manifest.touch()
-    with pytest.raises(NotImplementedError, match="does not load real patch scores"):
+    with pytest.raises(FileNotFoundError, match="Real patch-score table not found"):
         run_lobe_analysis(
             manifest_path=manifest,
             output_csv=tmp_path / "lobe_features.csv",
+            patch_scores_path=tmp_path / "missing_scores.csv",
         )
     assert not (tmp_path / "lobe_features.csv").exists()
 
