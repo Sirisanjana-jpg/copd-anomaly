@@ -16,7 +16,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from copd_anomaly.anomaly.density import GaussianMixtureDensity
+from copd_anomaly.anomaly.density import GaussianMixtureDensity, RealNVPFlow, RealNVPFlowDensity
 from copd_anomaly.evaluation.metrics import ModelEvaluator
 from copd_anomaly.models.encoder import ResNet3DEncoder
 from copd_anomaly.patches.dataset import ShardedPatchDataset
@@ -99,10 +99,13 @@ def score_real_patches(
     output_dir: Path = Path("outputs/real/reports"),
     batch_size: int = 8,
     device: str = "auto",
+    density_type: str = "gmm",
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Score every real patch and aggregate to scan/patient rows without inventing labels."""
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1.")
+    if density_type not in {"gmm", "flow"}:
+        raise ValueError("density_type must be 'gmm' or 'flow'.")
     if not shards_dir.is_dir():
         raise FileNotFoundError(f"Real patch shard directory not found: {shards_dir}")
     if not encoder_ckpt.is_file():
@@ -141,12 +144,31 @@ def score_real_patches(
     ).to(device_obj)
     encoder.load_state_dict(checkpoint["model_state_dict"])
     encoder.eval()
-    density = GaussianMixtureDensity.load(str(density_model_path))
-    if density.training_mode != "real_patch_training":
-        raise ValueError(
-            "Real inference requires a density model with explicit real_patch_training provenance. "
-            "Refit density from the real training split; legacy/unverified artifacts are rejected."
-        )
+    if density_type == "gmm":
+        density = GaussianMixtureDensity.load(str(density_model_path))
+        if density.training_mode != "real_patch_training":
+            raise ValueError(
+                "Real inference requires a density model with explicit real_patch_training provenance. "
+                "Refit density from the real training split; legacy/unverified artifacts are rejected."
+            )
+    else:
+        try:
+            density_checkpoint = torch.load(
+                density_model_path, map_location="cpu", weights_only=False
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Unable to load flow density checkpoint: {exc}") from exc
+        if (
+            not isinstance(density_checkpoint, dict)
+            or density_checkpoint.get("training_mode") != "real_patch_training"
+            or "flow_state" not in density_checkpoint
+            or "dim" not in density_checkpoint
+        ):
+            raise ValueError("Flow inference requires a verified real_patch_training checkpoint.")
+        density_dim = int(density_checkpoint["dim"])
+        density = RealNVPFlowDensity(dim=density_dim, n_layers=4)
+        density.flow = RealNVPFlow(dim=density_dim, n_layers=4)
+        density.flow.load_state_dict(density_checkpoint["flow_state"])
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     embeddings = []
     with torch.no_grad():
@@ -252,6 +274,7 @@ def main() -> None:
     parser.add_argument("--encoder-ckpt", type=Path, default=Path("outputs/real/checkpoints/encoder_best.pt"))
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
+    parser.add_argument("--density-type", choices=["gmm", "flow"], default="gmm")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/real/reports"))
     args = parser.parse_args()
     if args.real_inference:
@@ -262,6 +285,7 @@ def main() -> None:
             output_dir=args.output_dir,
             batch_size=args.batch_size,
             device=args.device,
+            density_type=args.density_type,
         )
     else:
         score_and_evaluate(
