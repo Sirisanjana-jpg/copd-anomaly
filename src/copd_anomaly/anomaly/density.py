@@ -9,6 +9,8 @@ Implements:
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Literal
 
 import joblib
@@ -40,6 +42,13 @@ class GaussianMixtureDensity(DensityModel):
     def fit(self, z_normal: np.ndarray | torch.Tensor) -> None:
         if isinstance(z_normal, torch.Tensor):
             z_normal = z_normal.detach().cpu().numpy()
+        z_normal = np.asarray(z_normal)
+        if z_normal.ndim != 2 or z_normal.shape[0] < 2 or z_normal.shape[1] < 1:
+            raise ValueError(
+                f"Expected at least two 2D embeddings for density fitting, got {z_normal.shape}."
+            )
+        if not np.isfinite(z_normal).all():
+            raise ValueError("Density fitting embeddings contain NaN or infinite values.")
 
         n_samples, _ = z_normal.shape
         n_comp = min(self.n_components, max(1, n_samples // 5))
@@ -65,16 +74,28 @@ class GaussianMixtureDensity(DensityModel):
         return self.gmm.score_samples(z)
 
     def save(self, path: str) -> None:
-        joblib.dump(
-            {
-                "gmm": self.gmm,
-                "params": {
-                    "n_components": self.n_components,
-                    "covariance_type": self.covariance_type,
+        if self.gmm is None:
+            raise RuntimeError("Cannot save a GMM density model before fitting.")
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.tmp")
+        try:
+            joblib.dump(
+                {
+                    "gmm": self.gmm,
+                    "params": {
+                        "n_components": self.n_components,
+                        "covariance_type": self.covariance_type,
+                    },
                 },
-            },
-            path,
-        )
+                temporary,
+            )
+            check = joblib.load(temporary)
+            if check.get("gmm") is None or not hasattr(check["gmm"], "means_"):
+                raise IOError(f"Density model verification failed for {destination}.")
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     @classmethod
     def load(cls, path: str) -> GaussianMixtureDensity:
