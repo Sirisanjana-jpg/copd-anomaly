@@ -4,7 +4,7 @@ The repository is a normal Python package with path-based command-line tools. Co
 
 ## Supported baseline
 
-- Python 3.10 or 3.11 (see `pyproject.toml`).
+- Python 3.10, 3.11, or 3.12 (see `pyproject.toml`).
 - GPU recommended for encoder training; CT preprocessing and QC can run on CPU if memory/time permit.
 - Install with `python -m pip install -e ".[dev]"`.
 - Keep raw scans, derived masks, patch shards, checkpoints, and patient tables outside the Git repository.
