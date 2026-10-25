@@ -16,6 +16,7 @@ Run in a notebook cell:
 
 ```python
 import os, shutil, sys, torch
+
 print("Python:", sys.version)
 print("Torch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
@@ -31,6 +32,7 @@ Colab supports mounting Google Drive. Use an approved private Drive location and
 
 ```python
 from google.colab import drive
+
 drive.mount("/content/drive")
 ```
 
@@ -38,6 +40,7 @@ Example path setup (replace the directory with the user's actual private data lo
 
 ```python
 from pathlib import Path
+
 DATA_ROOT = Path("/content/drive/MyDrive/copd_anomaly_data")
 WORK_ROOT = Path("/content/copd-anomaly-work")
 WORK_ROOT.mkdir(parents=True, exist_ok=True)
@@ -51,6 +54,7 @@ Kaggle does not support Colab's `drive.mount()` API. Approved attached datasets 
 
 ```python
 from pathlib import Path
+
 INPUT_ROOT = Path("/kaggle/input")
 WORK_ROOT = Path("/kaggle/working/copd-anomaly-work")
 WORK_ROOT.mkdir(parents=True, exist_ok=True)
