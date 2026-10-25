@@ -142,7 +142,10 @@ def stream_ctrate(
         if selected_path.is_file():
             previous_selection = pd.read_csv(selected_path)
             current_selection = split_frame.reset_index(drop=True)
-            if not previous_selection.equals(current_selection):
+            selection_columns = ["VolumeName", "patient_id", "split"]
+            if not set(selection_columns).issubset(previous_selection.columns) or not previous_selection[
+                selection_columns
+            ].astype(str).equals(current_selection[selection_columns].astype(str)):
                 raise ValueError(
                     f"Selected cohort for {split_name} differs from the saved selection. "
                     "Use a fresh output directory rather than mixing cohorts."
