@@ -13,7 +13,7 @@
 | Patch extraction | Lobe-mask integration implemented; real output unverified | Optional `--lobe-masks-dir` in `make_patches.py` and `--segment-lobes` in CT-RATE streamer write actual lobe IDs; audit counts, HU values, split leakage, masks and coverage |
 | Encoder training | Added resumable epoch checkpoints, history CSV, and 1-/2-channel input detection; no real training verified here | Train from real shards; inspect loss, checkpoint metadata, and stability over the intended run |
 | Density fitting | Implementation present; depends on a real trained encoder and eligible real patches | Fit only on defined normal training patches; report counts and cohort selection |
-| Real anomaly inference / proxy evaluation | Patch/scan/patient scoring implemented; not run or validated on real data; held-out report-label evaluation remains incomplete | Run inference on held-out real shards, audit outputs and leakage; connect CT-RATE report labels using a pre-specified, reproducible label extraction/validation method before proxy AUC |
+| Real anomaly inference / proxy evaluation | Patch/scan/patient scoring and held-out proxy evaluator implemented; not run or validated on real data | Run inference on held-out real shards; provide a reviewed report-label table with a pre-specified extraction rule; audit outputs, patient joins, and held-out metrics |
 | Lobe feature analysis | Real patch-score input path implemented; not validated on real data | Generate masks, extract patches with lobe IDs, score them, and run `scripts/lobe_analysis.py`; verify all five lobes are covered per scan |
 | Synthetic multimodal / exacerbation ablations | Synthetic software tests only | Never present as clinical evidence; requires a real labelled cohort for clinical claims |
 | Publication readiness | **Blocked** | Clean CI, reproducible real-data pipeline, cohort-level leakage checks, validated registration/segmentation and held-out evaluation |
@@ -34,7 +34,7 @@
 3. Generate and QC real patch shards; ensure patient-level split integrity and document selection.
 4. Train encoder on real patches; save reproducible config and loss history. Training may take 1–2 days depending on GPU, data volume and patch count.
 5. Fit density model only from eligible training-set embeddings.
-6. Run real patch scoring and patient-level aggregation; then implement and validate held-out report-label proxy evaluation without describing it as clinical diagnosis.
+6. Run real patch scoring and patient-level aggregation; validate held-out report-label proxy evaluation with a reviewed label table and never describe it as clinical diagnosis.
 7. Run five-lobe segmentation and lobe-aware patch extraction, then verify missing-lobe handling and per-lobe coverage.
 8. Keep clinical/exacerbation modeling blocked until a real cohort with outcome labels is available.
 
@@ -61,7 +61,7 @@ Update this file only when a result is reproducibly verified; include command, d
 
 - Added strict validation for five-lobe masks and an explicit TotalSegmentator-based lobe-generation CLI. TotalSegmentator label IDs are mapped by documented anatomical class names; unexpected IDs fail instead of being guessed.
 - Added optional lobe-aware CT-RATE streaming via `--segment-lobes` and optional DIR-Lab patch extraction via `--lobe-masks-dir`. The default threshold-only path remains global-only and must not be used for lobe-wise claims.
-- Added real patch anomaly scoring with scan/patient aggregation and real lobe feature construction from scored patches. These outputs are marked `REAL_CT_PATCH_INFERENCE_UNVALIDATED`; they are research intermediates, not validated biomarkers or clinical predictions.
+- Added real patch anomaly scoring with scan/patient aggregation, optional GMM/flow scoring, and held-out report-label proxy evaluation. Scores are marked `REAL_CT_PATCH_INFERENCE_UNVALIDATED`; metrics are labelled report-label proxy, not clinical diagnosis.
 - Updated registration to preserve NIfTI origin/direction and reject implicit shape-mismatch resampling, which would invalidate landmark comparisons.
 - Added `docs/CLOUD_RUNTIME.md` describing path-based Colab/Kaggle execution and `docs/KAGGLE_REAL_DATA_SMOKE.md` for Kaggle smoke validation.
-- Still blocked externally: clinical exacerbation prediction requires a suitable approved cohort with longitudinal, timestamped exacerbation outcomes and baseline covariates. No code change can manufacture this evidence. CT-RATE report-label proxy evaluation also requires a validated report-label extraction method and held-out evaluation.
+- Still blocked externally: clinical exacerbation prediction requires a suitable approved cohort with longitudinal, timestamped exacerbation outcomes, baseline covariates, follow-up/censoring information, and an agreed index date. CT-RATE report-label proxy evaluation still requires a reviewed, reproducible report-label extraction table and a successful held-out real-data run. No code change can manufacture this evidence.
