@@ -41,25 +41,35 @@ def run_lobe_analysis(
             )
         scores_df = pd.read_csv(patch_scores_path)
         required = {
-            "patch_id", "patient_id", "scan_id", "lobe_id", "lung_fraction",
-            "volume_weight", "laa950_fraction", "anomaly_score", "data_status",
+            "patch_id",
+            "patient_id",
+            "scan_id",
+            "lobe_id",
+            "lung_fraction",
+            "volume_weight",
+            "laa950_fraction",
+            "anomaly_score",
+            "data_status",
         }
         missing = required - set(scores_df.columns)
         if missing:
             raise ValueError(f"Patch-score table is missing required columns: {sorted(missing)}.")
         if scores_df.empty:
             raise ValueError("Patch-score table is empty; no lobe report was written.")
-        if not scores_df["data_status"].astype(str).eq(
-            "REAL_CT_PATCH_INFERENCE_UNVALIDATED"
-        ).all():
-            raise ValueError("Patch-score table provenance is not a verified real-inference output.")
+        if not scores_df["data_status"].astype(str).eq("REAL_CT_PATCH_INFERENCE_UNVALIDATED").all():
+            raise ValueError(
+                "Patch-score table provenance is not a verified real-inference output."
+            )
         if scores_df["patch_id"].astype(str).duplicated().any():
             raise ValueError("Patch-score table contains duplicate patch IDs.")
         score_values = pd.to_numeric(scores_df["anomaly_score"], errors="coerce").to_numpy(float)
         if not np.isfinite(score_values).all():
             raise ValueError("Patch-score table contains non-finite anomaly scores.")
         lobe_values = pd.to_numeric(scores_df["lobe_id"], errors="coerce").to_numpy(float)
-        if not np.isfinite(lobe_values).all() or not np.equal(lobe_values, np.floor(lobe_values)).all():
+        if (
+            not np.isfinite(lobe_values).all()
+            or not np.equal(lobe_values, np.floor(lobe_values)).all()
+        ):
             raise ValueError("Patch-score table contains invalid lobe IDs.")
         if not set(lobe_values.astype(int)).issubset({1, 2, 3, 4, 5}):
             raise ValueError(
@@ -75,7 +85,8 @@ def run_lobe_analysis(
                     prm_by_case[str(prm_row["case_id"])] = {
                         key: float(value)
                         for key, value in prm_row.items()
-                        if key != "case_id" and isinstance(value, (int, float, np.number))
+                        if key != "case_id"
+                        and isinstance(value, (int, float, np.number))
                         and pd.notna(value)
                     }
 
@@ -172,12 +183,22 @@ def run_lobe_analysis(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build lobe-wise features from patch anomaly scores.")
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/dirlab_manifest.parquet"))
+    parser = argparse.ArgumentParser(
+        description="Build lobe-wise features from patch anomaly scores."
+    )
+    parser.add_argument(
+        "--manifest", type=Path, default=Path("data/processed/dirlab_manifest.parquet")
+    )
     parser.add_argument("--prm-report", type=Path, default=Path("reports/dirlab_prm_stats.csv"))
-    parser.add_argument("--patch-scores", type=Path, default=Path("outputs/real/reports/patch_anomaly_scores.csv"))
-    parser.add_argument("--output", type=Path, default=Path("outputs/real/reports/lobe_features.csv"))
-    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic data for code tests only")
+    parser.add_argument(
+        "--patch-scores", type=Path, default=Path("outputs/real/reports/patch_anomaly_scores.csv")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("outputs/real/reports/lobe_features.csv")
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Generate synthetic data for code tests only"
+    )
     args = parser.parse_args()
     run_lobe_analysis(
         manifest_path=args.manifest,
