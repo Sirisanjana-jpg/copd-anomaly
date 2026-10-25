@@ -138,6 +138,13 @@ def fit_density_estimator(
                 "Refusing an encoder checkpoint without explicit real_patch_training provenance. "
                 "Legacy checkpoints may have been created by synthetic fallback code; retrain from real shards."
             )
+        if checkpoint.get("epoch_complete", True) is False:
+            raise ValueError(
+                "The supplied encoder checkpoint is a mid-epoch recovery point. "
+                "Resume training to finish the epoch and use encoder_best.pt for density fitting."
+            )
+        if int(checkpoint.get("trained_steps", 0)) < 1:
+            raise ValueError("Encoder checkpoint contains no completed optimizer steps.")
         if "model_state_dict" not in checkpoint:
             raise ValueError(
                 f"Invalid encoder checkpoint (missing model_state_dict): {encoder_ckpt}"
