@@ -402,18 +402,22 @@ def main() -> None:
         "--dry-run", action="store_true", help="Run five synthetic steps; not research training"
     )
     args = parser.parse_args()
-    train_contrastive_encoder(
-        shards_dir=args.shards_dir,
-        checkpoint_dir=args.checkpoint_dir,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        temperature=args.temperature,
-        dry_run=args.dry_run,
-        device=args.device,
-        seed=args.seed,
-        resume_from=args.resume_from,
-    )
+    try:
+        train_contrastive_encoder(
+            shards_dir=args.shards_dir,
+            checkpoint_dir=args.checkpoint_dir,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            temperature=args.temperature,
+            dry_run=args.dry_run,
+            device=args.device,
+            seed=args.seed,
+            resume_from=args.resume_from,
+        )
+    except Exception:
+        logger.exception("Encoder training terminated with an error.")
+        raise
 
 
 if __name__ == "__main__":
