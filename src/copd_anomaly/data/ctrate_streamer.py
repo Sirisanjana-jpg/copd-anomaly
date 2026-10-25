@@ -16,8 +16,8 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-from nibabel.processing import resample_to_output
 import pandas as pd
+from nibabel.processing import resample_to_output
 
 from copd_anomaly.patches.dataset import ShardedPatchWriter
 from copd_anomaly.patches.sampler import UniformLungPatchSampler
