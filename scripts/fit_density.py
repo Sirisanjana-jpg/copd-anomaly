@@ -183,6 +183,21 @@ def fit_density_estimator(
             n_components=n_components, covariance_type="diag", random_state=seed
         )
         density_model.fit(z_normal)
+        density_model.training_mode = "synthetic_dry_run" if dry_run else "real_patch_training"
+        density_model.fit_metadata.update(
+            {
+                "selection_method": (
+                    "random synthetic embeddings"
+                    if dry_run
+                    else "LAA-950 <= 0.01 pseudo-normal heuristic; not verified healthy controls"
+                ),
+                "shards_dir": str(shards_dir) if shards_dir is not None and not dry_run else None,
+                "encoder_checkpoint": (
+                    str(encoder_ckpt) if encoder_ckpt is not None and not dry_run else None
+                ),
+                "seed": int(seed),
+            }
+        )
         density_model.save(str(output_model_path))
     else:
         density_model = RealNVPFlowDensity(dim=z_normal.shape[1], n_layers=4, epochs=10)
