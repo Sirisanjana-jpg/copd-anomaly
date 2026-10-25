@@ -230,7 +230,14 @@ class ShardedPatchDataset(Dataset):
             raise ValueError("Patch manifest laa950_fraction values must be within [0, 1].")
         if (self.manifest["volume_weight"] <= 0.0).any():
             raise ValueError("Patch manifest volume_weight values must be positive.")
-        lobe_ids = set(pd.to_numeric(self.manifest["lobe_id"], errors="coerce").dropna().astype(int))
+        lobe_values = pd.to_numeric(self.manifest["lobe_id"], errors="coerce").to_numpy(
+            dtype=np.float64
+        )
+        if not np.isfinite(lobe_values).all() or not np.equal(
+            lobe_values, np.floor(lobe_values)
+        ).all():
+            raise ValueError("Patch manifest contains missing or non-integer lobe IDs.")
+        lobe_ids = set(lobe_values.astype(int))
         if not lobe_ids.issubset({-1, 1, 2, 3, 4, 5}):
             raise ValueError(f"Patch manifest contains unsupported lobe IDs: {sorted(lobe_ids)}.")
         if self.manifest["patch_id"].astype(str).duplicated().any():
