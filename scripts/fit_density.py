@@ -33,6 +33,11 @@ def fit_density_estimator(
 ) -> Path:
     if n_components < 1:
         raise ValueError("n_components must be >= 1.")
+    output_parts = {part.lower() for part in output_model_path.parts}
+    if dry_run and "real" in output_parts:
+        raise ValueError("Synthetic density models cannot be written under a real output directory.")
+    if not dry_run and "synthetic" in output_parts:
+        raise ValueError("Real density models cannot be written under a synthetic output directory.")
     if model_type not in {"gmm", "flow"}:
         raise ValueError("model_type must be 'gmm' or 'flow'.")
 
