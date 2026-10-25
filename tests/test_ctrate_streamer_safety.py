@@ -1,4 +1,5 @@
 """Unit tests for CT-RATE split integrity and streaming preflight safety."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -18,17 +19,10 @@ def test_extract_patient_id_uses_split_prefix() -> None:
 
 
 def test_create_tiered_splits_is_patient_disjoint() -> None:
-    train = pd.DataFrame(
-        {"VolumeName": [f"train_{idx:05d}_a_1.nii.gz" for idx in range(130)]}
-    )
-    valid = pd.DataFrame(
-        {"VolumeName": [f"valid_{idx:05d}_a_1.nii.gz" for idx in range(130, 200)]}
-    )
+    train = pd.DataFrame({"VolumeName": [f"train_{idx:05d}_a_1.nii.gz" for idx in range(130)]})
+    valid = pd.DataFrame({"VolumeName": [f"valid_{idx:05d}_a_1.nii.gz" for idx in range(130, 200)]})
     splits = create_tiered_splits(train, valid, tier="lean", seed=42)
-    patients = {
-        name: set(frame["patient_id"].astype(str))
-        for name, frame in splits.items()
-    }
+    patients = {name: set(frame["patient_id"].astype(str)) for name, frame in splits.items()}
     assert len(splits["train"]) == 100
     assert len(splits["val"]) == 30
     assert len(splits["test"]) == 70
