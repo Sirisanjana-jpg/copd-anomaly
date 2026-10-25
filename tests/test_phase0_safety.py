@@ -13,7 +13,7 @@ from copd_anomaly.interfaces import PatchRecord
 from copd_anomaly.patches.dataset import ShardedPatchWriter
 from scripts.fit_density import fit_density_estimator
 from scripts.lobe_analysis import run_lobe_analysis
-from scripts.score_anomaly import score_and_evaluate
+from scripts.score_anomaly import score_and_evaluate, score_real_patches
 from scripts.train_encoder import train_contrastive_encoder
 
 
@@ -36,6 +36,17 @@ def test_density_refuses_missing_manifest(tmp_path: Path) -> None:
             output_model_path=tmp_path / "density.joblib",
         )
     assert not list(tmp_path.rglob("*.joblib"))
+
+
+def test_real_patch_inference_requires_real_shards_and_checkpoints(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Real patch shard directory not found"):
+        score_real_patches(
+            shards_dir=tmp_path / "missing_shards",
+            encoder_ckpt=tmp_path / "encoder_best.pt",
+            density_model_path=tmp_path / "density_model.joblib",
+            output_dir=tmp_path / "real",
+        )
+    assert not list(tmp_path.rglob("*.csv"))
 
 
 def test_real_scoring_does_not_emit_empty_report(tmp_path: Path) -> None:
