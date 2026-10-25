@@ -73,7 +73,9 @@ def register_pairs(
         zooms_xyz = img_insp.header.get_zooms()[:3]
         exp_zooms_xyz = img_exp.header.get_zooms()[:3]
         if not np.allclose(zooms_xyz, exp_zooms_xyz, rtol=0.0, atol=1e-4):
-            raise ValueError(f"Voxel spacing mismatch for {case_id}: {zooms_xyz} vs {exp_zooms_xyz}.")
+            raise ValueError(
+                f"Voxel spacing mismatch for {case_id}: {zooms_xyz} vs {exp_zooms_xyz}."
+            )
         spacing_zyx = (float(zooms_xyz[2]), float(zooms_xyz[1]), float(zooms_xyz[0]))
 
         # Load or generate masks
@@ -84,7 +86,9 @@ def register_pairs(
                 mask_img.affine, img_insp.affine, rtol=0.0, atol=1e-4
             ):
                 raise ValueError(f"Inhale mask geometry does not match CT for {case_id}.")
-            mask_insp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(np.uint8)
+            mask_insp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(
+                np.uint8
+            )
         else:
             mask_insp = segmenter.segment(vol_insp, spacing_zyx)
 
@@ -95,7 +99,9 @@ def register_pairs(
                 mask_img.affine, img_exp.affine, rtol=0.0, atol=1e-4
             ):
                 raise ValueError(f"Exhale mask geometry does not match CT for {case_id}.")
-            mask_exp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(np.uint8)
+            mask_exp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(
+                np.uint8
+            )
         else:
             mask_exp = segmenter.segment(vol_exp, spacing_zyx)
 
@@ -130,9 +136,7 @@ def register_pairs(
             pts_insp_warped_to_exp = registrar.transform_points(
                 pts_insp, reg_result.transform, spacing_zyx
             )
-            tre_stats = evaluate_tre(
-                pts_exp, pts_insp, pts_insp_warped_to_exp, spacing_zyx
-            )
+            tre_stats = evaluate_tre(pts_exp, pts_insp, pts_insp_warped_to_exp, spacing_zyx)
             tre_stats["case_id"] = case_id
             tre_records.append(tre_stats)
             logger.info(
