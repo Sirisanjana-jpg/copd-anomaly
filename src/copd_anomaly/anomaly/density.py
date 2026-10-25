@@ -64,6 +64,11 @@ class GaussianMixtureDensity(DensityModel):
             max_iter=150,
         )
         self.gmm.fit(z_normal)
+        if not self.gmm.converged_:
+            raise RuntimeError(
+                f"GMM did not converge after {self.gmm.n_iter_} iterations; "
+                "do not use this density model. Review embedding quality and sample count."
+            )
         logger.info("GMM fit converged successfully.")
 
     def log_prob(self, z: np.ndarray | torch.Tensor) -> np.ndarray:
