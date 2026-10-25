@@ -8,6 +8,7 @@ synthetic output area by default.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from pathlib import Path
 
@@ -21,6 +22,24 @@ from copd_anomaly.patches.dataset import ShardedPatchDataset
 from copd_anomaly.utils.helpers import get_logger, set_seed
 
 logger = get_logger("fit_density")
+
+
+def _attach_density_file_log(log_path: Path) -> None:
+    resolved_path = str(log_path.resolve())
+    if any(
+        isinstance(handler, logging.FileHandler)
+        and handler.baseFilename == resolved_path
+        for handler in logger.handlers
+    ):
+        return
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
 
 
 def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
@@ -91,6 +110,7 @@ def fit_density_estimator(
 
     set_seed(seed)
     output_model_path.parent.mkdir(parents=True, exist_ok=True)
+    _attach_density_file_log(output_model_path.parent / "density_fit.log")
 
     if dry_run:
         logger.warning("SYNTHETIC DRY RUN ONLY: fitting density on random embeddings, not CT data.")
