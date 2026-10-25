@@ -31,6 +31,17 @@ Replace the two metadata paths with your real file locations. The smoke pass use
 
 The streamer canonicalizes image orientation, resamples intensities to a 1 mm isotropic grid, checks for non-finite and implausible non-HU intensity ranges, derives a threshold lung mask, extracts patches and writes per-split manifests. It logs failed volumes instead of silently counting them as successful. Inspect the masks and patch locations visually before scaling up. The current threshold mask is a baseline, not validated five-lobe segmentation; do not report lobe-wise findings from it.
 
+### Optional lobe-wise CT-RATE extraction
+
+The default threshold path intentionally creates **global-only** patches (lobe ID `-1`). To create lobe-wise patch metadata, install the optional segmentation dependency and use a fresh output directory:
+
+```bash
+python -m pip install -e ".[dev,segmentation]"
+python scripts/stream_ctrate.py --train-metadata data/raw/ctrate/train_metadata.csv --valid-metadata data/raw/ctrate/valid_metadata.csv --output-dir data/processed/ctrate_lobes_smoke --tier lean --max-volumes-per-split 1 --patch-size 50 --max-patches-per-scan 100 --segment-lobes
+```
+
+TotalSegmentator is run on each selected scan and its named lung-lobe classes are mapped to project labels: 1=RUL, 2=RML, 3=RLL, 4=LUL, 5=LLL. The code fails closed if it cannot produce a label map; it does not substitute a threshold mask. This is slower than threshold segmentation. Review each label mask and patch coverage before any training. A valid label map is still not a guarantee of anatomical accuracy; segmentation quality must be manually/quantitatively checked before publication. Do not resume a non-lobe run with `--segment-lobes` or vice versa; the run config is intentionally different.
+
 Outputs are stored in separate directories:
 - `data/processed/ctrate_smoke/train/`
 - `data/processed/ctrate_smoke/val/`
