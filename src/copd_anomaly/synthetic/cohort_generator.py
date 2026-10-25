@@ -52,7 +52,7 @@ def generate_synthetic_copd_cohort(
 
     # GOLD Staging based on FEV1 % predicted (for FEV1/FVC < 0.70)
     gold_stages = []
-    for f1, ratio in zip(fev1_pct, fev1_fvc):
+    for f1, ratio in zip(fev1_pct, fev1_fvc, strict=True):
         if ratio >= 0.70:
             gold_stages.append(0)  # At risk / Preserved ratio
         elif f1 >= 80.0:
