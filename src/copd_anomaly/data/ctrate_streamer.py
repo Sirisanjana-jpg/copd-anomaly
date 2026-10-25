@@ -207,7 +207,7 @@ class CTRATEStreamer:
 
         except Exception as exc:
             logger.error(f"Failed to process remote volume {volume_name}: {exc}")
-            return 0
+            raise RuntimeError(f"Failed to process remote volume {volume_name}") from exc
 
         finally:
             if downloaded_path and downloaded_path.exists():
