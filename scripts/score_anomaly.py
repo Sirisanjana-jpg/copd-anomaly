@@ -5,6 +5,7 @@ This script currently supports an explicit synthetic smoke test only. Real infer
 must be wired to a patient/patch manifest before a real evaluation report is produced.
 Synthetic results are never labeled as clinical COPD classification.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,7 +18,9 @@ from copd_anomaly.evaluation.metrics import ModelEvaluator
 from copd_anomaly.utils.helpers import get_logger
 
 logger = get_logger("score_anomaly")
-PROXY_WARNING = "SYNTHETIC DRY RUN — report-label proxy, not COPD classification; not real CT evaluation."
+PROXY_WARNING = (
+    "SYNTHETIC DRY RUN — report-label proxy, not COPD classification; not real CT evaluation."
+)
 
 
 def score_and_evaluate(
@@ -37,8 +40,12 @@ def score_and_evaluate(
         scores_mean = np.concatenate([rng.normal(10.0, 3.0, 50), rng.normal(18.0, 4.0, 50)])
         scores_p90 = np.concatenate([rng.normal(12.0, 3.0, 50), rng.normal(22.0, 4.0, 50)])
         df_patients = pd.DataFrame(
-            {"patient_id": [f"synthetic_{i:03d}" for i in range(100)],
-             "y_true": y_true, "score_mean": scores_mean, "score_p90": scores_p90}
+            {
+                "patient_id": [f"synthetic_{i:03d}" for i in range(100)],
+                "y_true": y_true,
+                "score_mean": scores_mean,
+                "score_p90": scores_p90,
+            }
         )
         metric_type = PROXY_WARNING
     else:
@@ -73,7 +80,9 @@ def score_and_evaluate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate report-label proxy metrics.")
-    parser.add_argument("--density-model", type=Path, default=Path("outputs/real/checkpoints/density_model.joblib"))
+    parser.add_argument(
+        "--density-model", type=Path, default=Path("outputs/real/checkpoints/density_model.joblib")
+    )
     parser.add_argument("--output-report", type=Path, default=Path("reports/proxy_auc_report.csv"))
     parser.add_argument("--dry-run", action="store_true", help="Evaluate synthetic scores only")
     parser.add_argument("--bootstraps", type=int, default=500)

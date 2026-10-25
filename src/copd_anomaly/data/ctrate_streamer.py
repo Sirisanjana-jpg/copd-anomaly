@@ -216,4 +216,3 @@ class CTRATEStreamer:
                     logger.debug(f"Deleted temporary raw NIfTI: {downloaded_path.name}")
                 except Exception as exc:
                     logger.warning(f"Could not delete temporary file {downloaded_path}: {exc}")
-

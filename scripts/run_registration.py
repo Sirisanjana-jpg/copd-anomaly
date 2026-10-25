@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -69,13 +70,17 @@ def register_pairs(
         # Load or generate masks
         insp_mask_path = masks_dir / f"{case_id}_insp_mask.nii.gz"
         if insp_mask_path.exists():
-            mask_insp = np.transpose(nib.load(str(insp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0))
+            mask_insp = np.transpose(
+                nib.load(str(insp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0)
+            )
         else:
             mask_insp = segmenter.segment(vol_insp, spacing_zyx)
 
         exp_mask_path = masks_dir / f"{case_id}_exp_mask.nii.gz"
         if exp_mask_path.exists():
-            mask_exp = np.transpose(nib.load(str(exp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0))
+            mask_exp = np.transpose(
+                nib.load(str(exp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0)
+            )
         else:
             mask_exp = segmenter.segment(vol_exp, spacing_zyx)
 
@@ -115,7 +120,9 @@ def register_pairs(
             )
 
         # PRM computation
-        prm_stats = compute_prm_stats(vol_insp, reg_result.warped_volume, mask_insp, spacing_zyx=spacing_zyx)
+        prm_stats = compute_prm_stats(
+            vol_insp, reg_result.warped_volume, mask_insp, spacing_zyx=spacing_zyx
+        )
         prm_stats["case_id"] = case_id
         prm_records.append(prm_stats)
         logger.info(
@@ -146,7 +153,9 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/registered"))
     parser.add_argument("--reports-dir", type=Path, default=Path("reports"))
     parser.add_argument("--config", type=Path, default=Path("configs/data/dirlab_cases.yaml"))
-    parser.add_argument("--fast-mode", action="store_true", help="Run with minimal iterations for testing.")
+    parser.add_argument(
+        "--fast-mode", action="store_true", help="Run with minimal iterations for testing."
+    )
     parser.add_argument("--cases", nargs="*", default=None, help="Filter cases.")
     args = parser.parse_args()
 

@@ -77,7 +77,9 @@ def build_manifest(
             shape_zyx = vol_hu.shape
 
             is_valid_hu, median_hu = loader.verify_hu_offset(vol_hu)
-            logger.info(f"  {case_id}_{phase} median lung HU: {median_hu:.1f} (valid: {is_valid_hu})")
+            logger.info(
+                f"  {case_id}_{phase} median lung HU: {median_hu:.1f} (valid: {is_valid_hu})"
+            )
 
             nifti_path = output_nifti_dir / f"{case_id}_{phase}.nii.gz"
             if not nifti_path.exists() or nifti_path.stat().st_size == 0:
@@ -151,7 +153,9 @@ def main() -> None:
         type=Path,
         default=Path("data/processed/dirlab_manifest.parquet"),
     )
-    parser.add_argument("--cases", nargs="*", default=None, help="Optional subset of cases to process.")
+    parser.add_argument(
+        "--cases", nargs="*", default=None, help="Optional subset of cases to process."
+    )
     args = parser.parse_args()
 
     try:
@@ -171,4 +175,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

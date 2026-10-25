@@ -30,7 +30,9 @@ class Random3DFlip(nn.Module):
 class RandomIntensityJitter(nn.Module):
     """Subtle intensity scaling and additive Gaussian noise for normalized [0, 1] patches."""
 
-    def __init__(self, scale_range: tuple[float, float] = (0.9, 1.1), noise_std: float = 0.02) -> None:
+    def __init__(
+        self, scale_range: tuple[float, float] = (0.9, 1.1), noise_std: float = 0.02
+    ) -> None:
         super().__init__()
         self.scale_range = scale_range
         self.noise_std = noise_std

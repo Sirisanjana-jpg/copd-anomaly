@@ -5,6 +5,7 @@ Only emits a manifest when real scans, masks, and eligible patches are present.
 The current patching path does not assign five-lobe labels; lobe-wise features must
 remain disabled until validated lobe masks are connected.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,7 +41,9 @@ def extract_and_shard_patches(
     if cases:
         nifti_files = [path for path in nifti_files if path.name.split("_")[0] in cases]
     if not nifti_files:
-        raise FileNotFoundError(f"No inspiratory NIfTI scans matched in {nifti_dir} for cases={cases}.")
+        raise FileNotFoundError(
+            f"No inspiratory NIfTI scans matched in {nifti_dir} for cases={cases}."
+        )
 
     existing_manifest = output_dir / "patch_manifest.parquet"
     if existing_manifest.exists() or (output_dir / "patch_manifest.csv").exists():

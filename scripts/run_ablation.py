@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -93,7 +94,9 @@ def run_ablation_experiments(
 
     ablation_predictions = {name: np.zeros(len(df)) for name in ABLATION_FEATURE_SETS}
 
-    logger.info(f"Running {n_splits}-fold cross-validation across {len(ABLATION_FEATURE_SETS)} configurations...")
+    logger.info(
+        f"Running {n_splits}-fold cross-validation across {len(ABLATION_FEATURE_SETS)} configurations..."
+    )
 
     for train_idx, val_idx in cv.split(df, y):
         df_train, df_val = df.iloc[train_idx], df.iloc[val_idx]
@@ -134,7 +137,9 @@ def run_ablation_experiments(
                 "auprc": round(float(pr_auc), 4),
                 "brier_score": round(float(brier), 4),
                 "delta_auroc_vs_baseline": round(float(auc - roc_auc_score(y, baseline_preds)), 4),
-                "p_value_vs_baseline": round(float(p_val), 4) if name != "4_clinical_plus_spiro" else 1.0,
+                "p_value_vs_baseline": round(float(p_val), 4)
+                if name != "4_clinical_plus_spiro"
+                else 1.0,
                 "statistically_significant": bool(p_val < 0.05 and name != "4_clinical_plus_spiro"),
             }
         )
@@ -150,12 +155,18 @@ def run_ablation_experiments(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run multimodal feature ablation experiments.")
-    parser.add_argument("--cohort", type=Path, default=Path("data/processed/synthetic_cohort.parquet"))
-    parser.add_argument("--output", type=Path, default=Path("reports/multimodal_ablation_results.csv"))
+    parser.add_argument(
+        "--cohort", type=Path, default=Path("data/processed/synthetic_cohort.parquet")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("reports/multimodal_ablation_results.csv")
+    )
     parser.add_argument("--splits", type=int, default=5)
     args = parser.parse_args()
 
-    run_ablation_experiments(cohort_path=args.cohort, output_report=args.output, n_splits=args.splits)
+    run_ablation_experiments(
+        cohort_path=args.cohort, output_report=args.output, n_splits=args.splits
+    )
 
 
 if __name__ == "__main__":

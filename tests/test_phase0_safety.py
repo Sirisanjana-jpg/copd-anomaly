@@ -1,4 +1,5 @@
 """Safety tests for fail-closed real-data paths and explicit synthetic provenance."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -8,7 +8,6 @@ multimodal fusion architectures, uncertainty heads, and survival ablations.
 
 from __future__ import annotations
 
-from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -66,12 +65,18 @@ def generate_synthetic_copd_cohort(
             gold_stages.append(4)  # GOLD 4: Very Severe
 
     # 3. Clinical history
-    prior_exacerbations = rng.poisson(lam=(0.5 + 0.4 * np.array(gold_stages)), size=n_patients).clip(0, 8)
+    prior_exacerbations = rng.poisson(
+        lam=(0.5 + 0.4 * np.array(gold_stages)), size=n_patients
+    ).clip(0, 8)
 
     # 4. Quantitative Imaging Features (correlated with GOLD and latent severity)
-    prm_emph = (1.5 * np.array(gold_stages) ** 2 + rng.exponential(scale=3.0, size=n_patients)).clip(0.1, 45.0)
+    prm_emph = (
+        1.5 * np.array(gold_stages) ** 2 + rng.exponential(scale=3.0, size=n_patients)
+    ).clip(0.1, 45.0)
     prm_fsad = (5.0 * np.array(gold_stages) + rng.normal(8.0, 3.0, size=n_patients)).clip(1.0, 40.0)
-    global_anomaly = (10.0 + 3.5 * np.array(gold_stages) + 0.3 * prm_emph + rng.normal(0, 2.0, n_patients)).clip(5.0, 40.0)
+    global_anomaly = (
+        10.0 + 3.5 * np.array(gold_stages) + 0.3 * prm_emph + rng.normal(0, 2.0, n_patients)
+    ).clip(5.0, 40.0)
     upper_lower_ratio = rng.lognormal(mean=0.1, sigma=0.3, size=n_patients)
     heterogeneity_index = rng.gamma(shape=2.0, scale=1.5, size=n_patients)
 

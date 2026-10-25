@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 from typing import Literal
+
 import numpy as np
 import scipy.ndimage as ndi
 
@@ -109,7 +110,7 @@ class LungSegmenter(Segmenter):
         # Keep up to 2 largest components (left and right lungs)
         # Note: sometimes left and right lungs are connected into 1 component; keep top components
         sorted_indices = np.argsort(component_sizes)[::-1]
-        
+
         mask = np.zeros_like(volume, dtype=np.uint8)
         # Add the largest component
         largest_idx = sorted_indices[0] + 1
@@ -133,8 +134,8 @@ class LungSegmenter(Segmenter):
         self, volume: np.ndarray, spacing_zyx: tuple[float, float, float]
     ) -> np.ndarray:
         try:
-            from totalsegmentator.python_api import totalsegmentator
             import nibabel as nib
+            from totalsegmentator.python_api import totalsegmentator
 
             sz, sy, sx = spacing_zyx
             affine = np.diag([sx, sy, sz, 1.0])
@@ -143,17 +144,15 @@ class LungSegmenter(Segmenter):
             seg_xyz = seg_nib.get_fdata().astype(np.uint8)
             return np.transpose(seg_xyz, (2, 1, 0))
         except Exception as e:
-            logger.warning(
-                f"TotalSegmentator failed ({e}); falling back to threshold whole-lung."
-            )
+            logger.warning(f"TotalSegmentator failed ({e}); falling back to threshold whole-lung.")
             return self._segment_threshold(volume)
 
     def _segment_lungmask(
         self, volume: np.ndarray, spacing_zyx: tuple[float, float, float]
     ) -> np.ndarray:
         try:
-            from lungmask import mask as lm_mask
             import SimpleITK as sitk
+            from lungmask import mask as lm_mask
 
             itk_img = sitk.GetImageFromArray(volume)
             itk_img.SetSpacing((spacing_zyx[2], spacing_zyx[1], spacing_zyx[0]))

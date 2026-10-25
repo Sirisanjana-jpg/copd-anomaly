@@ -9,6 +9,7 @@ and continuous point coordinate mapping for landmark TRE benchmarking.
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 import SimpleITK as sitk
 
@@ -61,7 +62,9 @@ def evaluate_tre(
                 "min_tre_mm": float(np.min(final_tre)),
                 "max_tre_mm": float(np.max(final_tre)),
                 "tre_reduction_pct": float(
-                    (np.mean(initial_tre) - np.mean(final_tre)) / (np.mean(initial_tre) + 1e-8) * 100.0
+                    (np.mean(initial_tre) - np.mean(final_tre))
+                    / (np.mean(initial_tre) + 1e-8)
+                    * 100.0
                 ),
             }
         )

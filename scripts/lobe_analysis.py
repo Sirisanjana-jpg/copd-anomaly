@@ -5,6 +5,7 @@ Real lobe-wise analysis must consume actual patch scores and validated lobe labe
 The current repository does not yet connect those inputs to this script, so real mode
 fails explicitly instead of generating fabricated patient features.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -80,10 +81,14 @@ def run_lobe_analysis(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run lobe-wise quantitative feature analysis.")
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/dirlab_manifest.parquet"))
+    parser.add_argument(
+        "--manifest", type=Path, default=Path("data/processed/dirlab_manifest.parquet")
+    )
     parser.add_argument("--prm-report", type=Path, default=Path("reports/dirlab_prm_stats.csv"))
     parser.add_argument("--output", type=Path, default=Path("reports/dirlab_lobe_features.csv"))
-    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic data for code smoke tests only")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Generate synthetic data for code smoke tests only"
+    )
     args = parser.parse_args()
     run_lobe_analysis(
         manifest_path=args.manifest,

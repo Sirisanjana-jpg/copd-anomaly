@@ -4,6 +4,7 @@ Lobe-wise quantitative feature builder.
 Missing lobe coverage is represented explicitly; it is never silently imputed with
 the global score, which could disguise failed or absent anatomical segmentation.
 """
+
 from __future__ import annotations
 
 import numpy as np

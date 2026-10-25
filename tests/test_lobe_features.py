@@ -210,4 +210,3 @@ def test_reconstruct_anomaly_volume():
     assert np.isclose(vol[10, 10, 10], 25.0)
     # Far corner voxel should be 0.0
     assert vol[0, 0, 0] == 0.0
-

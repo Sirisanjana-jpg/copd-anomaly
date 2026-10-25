@@ -82,7 +82,9 @@ class UniformLungPatchSampler(PatchSampler):
 
         # Convert to uint8 representation
         uint8_insp = window_and_to_uint8(volume_insp, self.window_hu)
-        uint8_exp = window_and_to_uint8(volume_exp, self.window_hu) if volume_exp is not None else None
+        uint8_exp = (
+            window_and_to_uint8(volume_exp, self.window_hu) if volume_exp is not None else None
+        )
 
         channels = 2 if uint8_exp is not None else 1
 
@@ -166,5 +168,7 @@ class UniformLungPatchSampler(PatchSampler):
             return np.zeros((0, channels, ps, ps, ps), dtype=np.uint8), []
 
         patches_array = np.stack(extracted_patches, axis=0)
-        logger.info(f"Extracted {len(records)} patches for {scan_id} (shape: {patches_array.shape})")
+        logger.info(
+            f"Extracted {len(records)} patches for {scan_id} (shape: {patches_array.shape})"
+        )
         return patches_array, records

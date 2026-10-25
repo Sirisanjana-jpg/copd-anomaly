@@ -51,4 +51,3 @@ def compute_config_hash(cfg: dict[str, Any] | Any) -> str:
 
     serialized = json.dumps(cfg_dict, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
-

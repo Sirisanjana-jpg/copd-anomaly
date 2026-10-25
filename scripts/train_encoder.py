@@ -4,6 +4,7 @@ Train a 3D ResNet contrastive encoder using real patch shards.
 Real training writes a best checkpoint, an epoch-by-epoch resumable checkpoint, and
 CSV loss history. Synthetic five-step training is explicit and is never a research checkpoint.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,7 +39,9 @@ def train_contrastive_encoder(
         raise ValueError("epochs must be >= 1 and batch_size must be >= 2 for NT-Xent.")
     if not dry_run:
         if shards_dir is None:
-            raise ValueError("Real training requires --shards-dir; use --dry-run only for a smoke test.")
+            raise ValueError(
+                "Real training requires --shards-dir; use --dry-run only for a smoke test."
+            )
         manifest = shards_dir / "patch_manifest.parquet"
         if not manifest.is_file() and not (shards_dir / "patch_manifest.csv").is_file():
             raise FileNotFoundError(
@@ -75,8 +78,12 @@ def train_contrastive_encoder(
         sample_patch, _ = dataset[0]
         input_channels = int(sample_patch.shape[0])
         if input_channels not in (1, 2):
-            raise ValueError(f"Expected 1-channel inhale or 2-channel paired patch; got {input_channels}.")
-        logger.info("Patch dataset has %d samples and %d input channel(s).", len(dataset), input_channels)
+            raise ValueError(
+                f"Expected 1-channel inhale or 2-channel paired patch; got {input_channels}."
+            )
+        logger.info(
+            "Patch dataset has %d samples and %d input channel(s).", len(dataset), input_channels
+        )
 
     model = ResNet3DEncoder(
         in_channels=input_channels, base_filters=16, embedding_dim=128, projection_dim=64
@@ -114,7 +121,9 @@ def train_contrastive_encoder(
         assert dataset is not None
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         if len(loader) == 0:
-            raise ValueError("No complete training batches are available; no checkpoint was written.")
+            raise ValueError(
+                "No complete training batches are available; no checkpoint was written."
+            )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
         if resume_from is not None:
@@ -143,7 +152,9 @@ def train_contrastive_encoder(
                 if best_path.is_file():
                     logger.info("Requested epochs already completed; returning %s", best_path)
                     return best_path
-                raise ValueError("Resume checkpoint is already at requested epochs but best checkpoint is missing.")
+                raise ValueError(
+                    "Resume checkpoint is already at requested epochs but best checkpoint is missing."
+                )
 
         for epoch in range(start_epoch, epochs):
             model.train()
@@ -166,7 +177,9 @@ def train_contrastive_encoder(
                 raise RuntimeError("Training produced zero batches; no checkpoint was written.")
             avg_loss = total_loss / n_batches
             scheduler.step()
-            history.append({"epoch": epoch + 1, "train_contrastive_loss": avg_loss, "batches": n_batches})
+            history.append(
+                {"epoch": epoch + 1, "train_contrastive_loss": avg_loss, "batches": n_batches}
+            )
             logger.info("Epoch %d/%d - contrastive loss %.5f", epoch + 1, epochs, avg_loss)
 
             payload = {
@@ -232,10 +245,16 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--temperature", type=float, default=0.07)
-    parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or another torch device string")
+    parser.add_argument(
+        "--device", default="auto", help="auto, cpu, cuda, or another torch device string"
+    )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--resume-from", type=Path, default=None, help="Resume real training from encoder_latest.pt")
-    parser.add_argument("--dry-run", action="store_true", help="Run five synthetic steps; not research training")
+    parser.add_argument(
+        "--resume-from", type=Path, default=None, help="Resume real training from encoder_latest.pt"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Run five synthetic steps; not research training"
+    )
     args = parser.parse_args()
     train_contrastive_encoder(
         shards_dir=args.shards_dir,

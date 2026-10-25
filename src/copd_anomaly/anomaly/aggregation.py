@@ -113,4 +113,3 @@ def extract_patient_anomaly_summary(
             summary["anomaly_heterogeneity_index"] = float(np.std(list(lobe_means.values())))
 
     return summary
-

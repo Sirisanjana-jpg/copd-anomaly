@@ -215,5 +215,3 @@ class PatchAnomalyScorer(AnomalyScorer):
         log_p = self.density_model.log_prob(z)
         scores = -log_p
         return scores.astype(np.float32)
-
-

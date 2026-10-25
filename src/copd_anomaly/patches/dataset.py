@@ -7,9 +7,10 @@ for millions of 3D thoracic CT patches without RAM exhaustion.
 
 from __future__ import annotations
 
-import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import torch
@@ -71,7 +72,9 @@ class ShardedPatchWriter:
         shard_path = self.output_dir / shard_name
         arr = np.stack(self.buffer_patches, axis=0)  # Shape (M, C, P, P, P) uint8
         np.save(shard_path, arr)
-        logger.info(f"Saved {shard_name} with {len(arr)} patches ({arr.nbytes / (1024*1024):.1f} MB)")
+        logger.info(
+            f"Saved {shard_name} with {len(arr)} patches ({arr.nbytes / (1024 * 1024):.1f} MB)"
+        )
 
         self.all_manifest_records.extend(self.buffer_records)
         self.current_shard_idx += 1

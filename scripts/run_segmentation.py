@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
 
@@ -64,7 +65,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run lung segmentation.")
     parser.add_argument("--nifti-dir", type=Path, default=Path("data/processed/nifti"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/masks"))
-    parser.add_argument("--backend", type=str, default="auto", choices=["auto", "threshold", "totalsegmentator", "lungmask"])
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="auto",
+        choices=["auto", "threshold", "totalsegmentator", "lungmask"],
+    )
     parser.add_argument("--cases", nargs="*", default=None, help="Optional cases to filter.")
     args = parser.parse_args()
 

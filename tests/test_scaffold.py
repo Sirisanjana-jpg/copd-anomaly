@@ -123,4 +123,3 @@ def test_no_secrets_in_tracked_files():
             content = root_file.read_text(encoding="utf-8", errors="ignore")
             matches = hf_token_regex.findall(content)
             assert len(matches) == 0, f"Potential Hugging Face secret detected in {root_file.name}!"
-
