@@ -124,6 +124,9 @@ python scripts/lobe_analysis.py
 
 ### 3.3 CT-RATE Streaming & GPU Training
 
+Cloud execution is supported through the same path-based scripts on **Google Colab or Kaggle**; see [`docs/CLOUD_RUNTIME.md`](docs/CLOUD_RUNTIME.md). The Kaggle real-data smoke checklist is in [`docs/KAGGLE_REAL_DATA_SMOKE.md`](docs/KAGGLE_REAL_DATA_SMOKE.md).
+
+
 Use the repository's resumable streaming CLI to prepare patient-disjoint CT-RATE patch shards, then train on the training split only. See [`docs/REAL_TRAINING_RUNBOOK.md`](docs/REAL_TRAINING_RUNBOOK.md) for the gated-access setup, one-volume smoke run, split outputs, resumable training commands, and current limitations.
 
 The streaming CLI uses threshold lung segmentation as a provisional baseline; inspect the masks and patch counts before a long GPU run. Real patient-level anomaly scoring and held-out evaluation are not yet implemented end-to-end. Do not treat successful pretraining or density fitting as evidence of diagnostic performance.
