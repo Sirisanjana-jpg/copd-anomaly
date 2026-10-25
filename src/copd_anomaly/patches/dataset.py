@@ -195,8 +195,14 @@ class ShardedPatchDataset(Dataset):
             )
         if self.manifest[["shard_name", "index_in_shard"]].isna().any().any():
             raise ValueError("Patch manifest contains missing shard references.")
-        if (self.manifest["index_in_shard"].astype(int) < 0).any():
+        numeric_indices = pd.to_numeric(self.manifest["index_in_shard"], errors="coerce")
+        if not np.isfinite(numeric_indices.to_numpy(dtype=np.float64)).all():
+            raise ValueError("Patch manifest contains non-numeric shard indices.")
+        if (numeric_indices < 0).any():
             raise ValueError("Patch manifest contains negative index_in_shard values.")
+        if not np.equal(numeric_indices, np.floor(numeric_indices)).all():
+            raise ValueError("Patch manifest contains non-integer shard indices.")
+        self.manifest["index_in_shard"] = numeric_indices.astype(np.int64)
         shard_names = self.manifest["shard_name"].astype(str).unique()
         unsafe_names = [
             name for name in shard_names if Path(name).name != name or not name.endswith(".npy")
@@ -232,6 +238,7 @@ class ShardedPatchDataset(Dataset):
 
     def _validate_shard_references(self) -> None:
         """Validate shard headers and manifest indices without loading patch arrays into RAM."""
+        expected_patch_shape: tuple[int, ...] | None = None
         for shard_name, rows in self.manifest.groupby("shard_name", sort=False):
             shard_path = self.dataset_dir / str(shard_name)
             try:
@@ -242,6 +249,14 @@ class ShardedPatchDataset(Dataset):
                 raise ValueError(
                     f"Invalid patch shard {shard_path}: expected uint8 5D array, "
                     f"got shape={shard.shape}, dtype={shard.dtype}."
+                )
+            patch_shape = tuple(shard.shape[1:])
+            if expected_patch_shape is None:
+                expected_patch_shape = patch_shape
+            elif patch_shape != expected_patch_shape:
+                raise ValueError(
+                    f"Patch shape differs across shards: {shard_path} has {patch_shape}, "
+                    f"expected {expected_patch_shape}."
                 )
             indices = rows["index_in_shard"].astype(int)
             if indices.max() >= len(shard):
