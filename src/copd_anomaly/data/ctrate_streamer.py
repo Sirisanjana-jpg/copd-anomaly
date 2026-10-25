@@ -82,7 +82,10 @@ def create_tiered_splits(
             raise ValueError(f"{name} metadata must contain a 'VolumeName' column.")
         if frame.empty:
             raise ValueError(f"{name} metadata is empty.")
-        if frame["VolumeName"].isna().any() or (frame["VolumeName"].astype(str).str.strip() == "").any():
+        if (
+            frame["VolumeName"].isna().any()
+            or (frame["VolumeName"].astype(str).str.strip() == "").any()
+        ):
             raise ValueError(f"{name} metadata contains empty VolumeName values.")
         if frame["VolumeName"].astype(str).duplicated().any():
             raise ValueError(f"{name} metadata contains duplicate VolumeName entries.")
