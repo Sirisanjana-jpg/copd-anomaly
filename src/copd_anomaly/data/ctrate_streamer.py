@@ -244,6 +244,29 @@ class CTRATEStreamer:
                 )
             if not np.isfinite(mask).all() or not np.any(mask > 0):
                 raise ValueError("Lung segmentation returned an empty or non-finite mask.")
+            mask_fraction = float(np.mean(mask > 0))
+            if not 0.01 <= mask_fraction <= 0.65:
+                raise ValueError(
+                    f"Implausible lung-mask fraction {mask_fraction:.3f}; expected 0.01–0.65. "
+                    "Inspect HU scaling and threshold segmentation before accepting this scan."
+                )
+            touches_xy_border = bool(
+                np.any(mask[:, 0, :])
+                or np.any(mask[:, -1, :])
+                or np.any(mask[:, :, 0])
+                or np.any(mask[:, :, -1])
+            )
+            if touches_xy_border:
+                raise ValueError(
+                    "Lung mask touches a lateral image border; possible exterior-air leakage. "
+                    "Rejecting this scan rather than extracting potentially invalid patches."
+                )
+            logger.info(
+                "%s: lung-mask fraction=%.3f, voxels=%d",
+                volume_name,
+                mask_fraction,
+                int(np.count_nonzero(mask)),
+            )
             stage = "patch_extraction"
             patches, records = self.sampler.extract_patches(
                 volume_insp=vol_zyx,
