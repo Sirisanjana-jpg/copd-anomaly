@@ -71,10 +71,12 @@ def extract_and_shard_patches(
         vol_insp = np.transpose(img_insp.get_fdata(dtype=np.float32), (2, 1, 0))
         img_mask = nib.load(str(mask_path))
         mask = np.transpose(img_mask.get_fdata(dtype=np.float32), (2, 1, 0))
-        if vol_insp.shape != mask.shape:
+        if vol_insp.shape != mask.shape or not np.allclose(
+            img_insp.affine, img_mask.affine, rtol=0.0, atol=1e-4
+        ):
             raise ValueError(
-                f"Volume/mask shape mismatch for {scan_id}: volume={vol_insp.shape}, mask={mask.shape}. "
-                "Check image geometry and resampling before patch extraction."
+                f"Volume/mask geometry mismatch for {scan_id}: volume shape={vol_insp.shape}, "
+                f"mask shape={mask.shape}. Check image affines and resampling before patch extraction."
             )
         if not np.isfinite(vol_insp).all() or not np.isfinite(mask).all():
             raise ValueError(f"Non-finite voxels found in volume or mask for {scan_id}.")
@@ -88,10 +90,12 @@ def extract_and_shard_patches(
         if registered_exp_path.is_file():
             exp_img = nib.load(str(registered_exp_path))
             vol_exp = np.transpose(exp_img.get_fdata(dtype=np.float32), (2, 1, 0))
-            if vol_exp.shape != vol_insp.shape:
+            if vol_exp.shape != vol_insp.shape or not np.allclose(
+                exp_img.affine, img_insp.affine, rtol=0.0, atol=1e-4
+            ):
                 raise ValueError(
-                    f"Registered expiratory volume shape mismatch for {case_id}: "
-                    f"{vol_exp.shape} != {vol_insp.shape}. Verify registration geometry."
+                    f"Registered expiratory volume geometry mismatch for {case_id}: "
+                    f"{vol_exp.shape} vs {vol_insp.shape}; verify shape and affine alignment."
                 )
 
         # Lobe labels are intentionally not fabricated. The current segmentation path
