@@ -102,11 +102,34 @@ class LungSegmenter(Segmenter):
             logger.warning("No voxels found in threshold range for lung segmentation.")
             return np.zeros_like(volume, dtype=np.uint8)
 
-        # Remove small noise and isolate major air cavities
+        # Remove any connected component touching a lateral image border. These components
+        # are usually exterior air; retaining them can create multi-litre false lung masks.
         labeled, num_features = ndi.label(binary)
         if num_features == 0:
             return np.zeros_like(volume, dtype=np.uint8)
+        border_labels = np.unique(
+            np.concatenate(
+                [
+                    labeled[:, 0, :].ravel(),
+                    labeled[:, -1, :].ravel(),
+                    labeled[:, :, 0].ravel(),
+                    labeled[:, :, -1].ravel(),
+                ]
+            )
+        )
+        border_labels = border_labels[border_labels > 0]
+        if border_labels.size:
+            binary[np.isin(labeled, border_labels)] = False
+        if not np.any(binary):
+            logger.warning(
+                "All threshold components touched a lateral border; refusing an invalid lung mask."
+            )
+            return np.zeros_like(volume, dtype=np.uint8)
 
+        # Relabel after exterior-air removal, then retain up to two major lung components.
+        labeled, num_features = ndi.label(binary)
+        if num_features == 0:
+            return np.zeros_like(volume, dtype=np.uint8)
         component_sizes = ndi.sum(binary, labeled, range(1, num_features + 1))
         # Keep up to 2 largest components (left and right lungs)
         # Note: sometimes left and right lungs are connected into 1 component; keep top components
