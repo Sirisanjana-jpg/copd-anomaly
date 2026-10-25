@@ -1,15 +1,15 @@
 """
-DIR-Lab Lobe-Wise Quantitative Analysis.
+Lobe-wise quantitative analysis entry point.
 
-Extracts lobe-resolved anomaly statistics, PRM biomarkers, and spatial gradients
-(upper-to-lower ratio, left-to-right asymmetry, heterogeneity index) across the 10 DIR-Lab cases.
-Outputs structured report to reports/dirlab_lobe_features.csv.
+Real lobe-wise analysis must consume actual patch scores and validated lobe labels.
+The current repository does not yet connect those inputs to this script, so real mode
+fails explicitly instead of generating fabricated patient features.
 """
-
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -26,52 +26,56 @@ def run_lobe_analysis(
     output_csv: Path = Path("reports/dirlab_lobe_features.csv"),
     dry_run: bool = False,
 ) -> pd.DataFrame:
+    if not dry_run:
+        if not manifest_path.is_file():
+            raise FileNotFoundError(
+                f"DIR-Lab manifest not found: {manifest_path}. No lobe report was written."
+            )
+        raise NotImplementedError(
+            "Real lobe analysis is not wired yet: this script does not load real patch scores or "
+            "validated lobe masks. Refusing to fabricate lobe IDs/scores. Complete segmentation, "
+            "patch-to-lobe mapping, and real anomaly inference first."
+        )
+
+    logger.warning(
+        "SYNTHETIC DRY RUN ONLY: generated patch scores/lobe IDs are artificial and are not "
+        "DIR-Lab measurements."
+    )
+    output_csv = (
+        Path("outputs/synthetic/reports/dirlab_lobe_features.csv")
+        if output_csv == Path("reports/dirlab_lobe_features.csv")
+        else output_csv
+    )
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     builder = LobeFeatureBuilder()
-
-    prm_dict = {}
-    if prm_report_path.exists():
-        df_prm = pd.read_csv(prm_report_path)
-        for _, row in df_prm.iterrows():
-            prm_dict[row["case_id"]] = row.to_dict()
-
+    rng = np.random.RandomState(42)
     records_by_case = []
-    cases = [f"copd{i}" for i in range(1, 11)]
-
-    for case_id in cases:
-        # Generate or load case patch records
-        rng = np.random.RandomState(hash(case_id) % (2**32))
+    for case_idx in range(1, 11):
+        case_id = f"synthetic_copd{case_idx}"
         n_patches = 50
-
-        patch_scores = rng.normal(loc=12.0 + (int(case_id.replace("copd", "")) % 3) * 3, scale=3.0, size=n_patches)
-        records = []
-        for p_idx in range(n_patches):
-            lobe = (p_idx % 5) + 1
-            records.append(
-                PatchRecord(
-                    patch_id=f"{case_id}_p{p_idx:03d}",
-                    patient_id=case_id,
-                    scan_id=f"{case_id}_insp",
-                    center_zyx=(20 + (p_idx % 20), 100, 100),
-                    lobe_id=lobe,
-                    lung_fraction=0.85,
-                    volume_weight=1.0,
-                    laa950_fraction=float(rng.uniform(0.01, 0.15)),
-                )
+        scores = rng.normal(loc=12.0 + (case_idx % 3) * 3, scale=3.0, size=n_patches)
+        records = [
+            PatchRecord(
+                patch_id=f"{case_id}_p{idx:03d}",
+                patient_id=case_id,
+                scan_id=f"{case_id}_synthetic",
+                center_zyx=(20 + (idx % 20), 100, 100),
+                lobe_id=(idx % 5) + 1,
+                lung_fraction=0.85,
+                volume_weight=1.0,
+                laa950_fraction=float(rng.uniform(0.01, 0.15)),
             )
-
-        case_prm = prm_dict.get(case_id, {})
-        feat_vector = builder.build_features(patch_scores, records, case_prm)
-        feat_vector["case_id"] = case_id
-        records_by_case.append(feat_vector)
-
-    df_feats = pd.DataFrame(records_by_case)
-    # Move case_id to front
-    cols = ["case_id"] + [c for c in df_feats.columns if c != "case_id"]
-    df_feats = df_feats[cols]
-    df_feats.to_csv(output_csv, index=False)
-    logger.info(f"Saved DIR-Lab lobe features report to {output_csv} ({len(df_feats)} cases)")
-    return df_feats
+            for idx in range(n_patches)
+        ]
+        features = builder.build_features(scores, records, {})
+        features["case_id"] = case_id
+        features["data_status"] = "SYNTHETIC_DRY_RUN_NOT_REAL_DIRLAB"
+        records_by_case.append(features)
+    df = pd.DataFrame(records_by_case)
+    df = df[["case_id"] + [col for col in df.columns if col != "case_id"]]
+    df.to_csv(output_csv, index=False)
+    logger.info("Saved synthetic smoke-test lobe report to %s", output_csv)
+    return df
 
 
 def main() -> None:
@@ -79,9 +83,14 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=Path("data/processed/dirlab_manifest.parquet"))
     parser.add_argument("--prm-report", type=Path, default=Path("reports/dirlab_prm_stats.csv"))
     parser.add_argument("--output", type=Path, default=Path("reports/dirlab_lobe_features.csv"))
+    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic data for code smoke tests only")
     args = parser.parse_args()
-
-    run_lobe_analysis(manifest_path=args.manifest, prm_report_path=args.prm_report, output_csv=args.output)
+    run_lobe_analysis(
+        manifest_path=args.manifest,
+        prm_report_path=args.prm_report,
+        output_csv=args.output,
+        dry_run=args.dry_run,
+    )
 
 
 if __name__ == "__main__":
