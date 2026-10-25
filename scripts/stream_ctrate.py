@@ -126,6 +126,7 @@ def stream_ctrate(
     temp_dir: Path = Path("data/interim/ctrate_temp"),
     max_volumes_per_split: int | None = None,
     resume: bool = True,
+    use_lobe_segmentation: bool = False,
 ) -> dict[str, int]:
     if tier not in {"lean", "medium", "full"}:
         raise ValueError(f"Unsupported tier {tier!r}; choose lean, medium, or full.")
@@ -163,6 +164,7 @@ def stream_ctrate(
         temp_dir=temp_dir,
         patch_size=patch_size,
         max_patches_per_scan=max_patches_per_scan,
+        use_lobe_segmentation=use_lobe_segmentation,
     )
     config = {
         "repo_id": repo_id,
@@ -172,6 +174,7 @@ def stream_ctrate(
         "max_patches_per_scan": max_patches_per_scan,
         "shard_size": shard_size,
         "max_volumes_per_split": max_volumes_per_split,
+        "use_lobe_segmentation": use_lobe_segmentation,
         "source_train_metadata": str(train_metadata_path),
         "source_valid_metadata": str(valid_metadata_path),
         "note": "CT-RATE report labels are proxy labels; this script does not establish clinical normality.",
