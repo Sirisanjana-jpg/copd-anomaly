@@ -27,8 +27,7 @@ logger = get_logger("fit_density")
 def _attach_density_file_log(log_path: Path) -> None:
     resolved_path = str(log_path.resolve())
     if any(
-        isinstance(handler, logging.FileHandler)
-        and handler.baseFilename == resolved_path
+        isinstance(handler, logging.FileHandler) and handler.baseFilename == resolved_path
         for handler in logger.handlers
     ):
         return
@@ -170,7 +169,9 @@ def fit_density_estimator(
             raise ValueError("No embeddings extracted from eligible patches.")
         z_normal = np.concatenate(embeddings, axis=0)
         if not np.isfinite(z_normal).all():
-            raise FloatingPointError("Encoder produced NaN or infinite embeddings; density model not saved.")
+            raise FloatingPointError(
+                "Encoder produced NaN or infinite embeddings; density model not saved."
+            )
         if z_normal.ndim != 2 or z_normal.shape[0] < max(2, n_components):
             raise ValueError(
                 f"Need at least max(2, n_components)={max(2, n_components)} embeddings; got {z_normal.shape}."
