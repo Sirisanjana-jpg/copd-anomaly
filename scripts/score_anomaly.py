@@ -120,7 +120,11 @@ def score_real_patches(
         raise ValueError("Real inference outputs cannot be written under a synthetic directory.")
 
     dataset = ShardedPatchDataset(shards_dir)
-    device_obj = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device == "auto" else torch.device(device)
+    device_obj = (
+        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device == "auto"
+        else torch.device(device)
+    )
     if device_obj.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested for inference but is not available.")
     try:
@@ -129,7 +133,10 @@ def score_real_patches(
         raise RuntimeError(f"Unable to load encoder checkpoint {encoder_ckpt}: {exc}") from exc
     if not isinstance(checkpoint, dict) or checkpoint.get("training_mode") != "real_patch_training":
         raise ValueError("Inference requires a checkpoint marked real_patch_training.")
-    if checkpoint.get("epoch_complete", True) is False or int(checkpoint.get("trained_steps", 0)) < 1:
+    if (
+        checkpoint.get("epoch_complete", True) is False
+        or int(checkpoint.get("trained_steps", 0)) < 1
+    ):
         raise ValueError("Inference requires a completed, trained encoder checkpoint.")
     if "model_state_dict" not in checkpoint:
         raise ValueError("Encoder checkpoint is missing model_state_dict.")
@@ -201,7 +208,9 @@ def score_real_patches(
 
     required = {"patient_id", "scan_id", "lobe_id", "anomaly_score"}
     if not required.issubset(patch_scores.columns):
-        raise ValueError(f"Scored manifest is missing columns: {sorted(required - set(patch_scores.columns))}")
+        raise ValueError(
+            f"Scored manifest is missing columns: {sorted(required - set(patch_scores.columns))}"
+        )
     scan_records = []
     for (patient_id, scan_id), group in patch_scores.groupby(["patient_id", "scan_id"], sort=True):
         row = {
@@ -218,28 +227,46 @@ def score_real_patches(
         for lobe_id, name in {1: "rul", 2: "rml", 3: "rll", 4: "lul", 5: "lll"}.items():
             lobe_scores = group.loc[group["lobe_id"] == lobe_id, "anomaly_score"]
             row[f"{name}_patch_count"] = int(len(lobe_scores))
-            row[f"{name}_anomaly_mean"] = float(lobe_scores.mean()) if len(lobe_scores) else float("nan")
-            row[f"{name}_anomaly_p90"] = float(lobe_scores.quantile(0.90)) if len(lobe_scores) else float("nan")
-        row["lobes_observed_count"] = sum(row[f"{name}_patch_count"] > 0 for name in ("rul", "rml", "rll", "lul", "lll"))
+            row[f"{name}_anomaly_mean"] = (
+                float(lobe_scores.mean()) if len(lobe_scores) else float("nan")
+            )
+            row[f"{name}_anomaly_p90"] = (
+                float(lobe_scores.quantile(0.90)) if len(lobe_scores) else float("nan")
+            )
+        row["lobes_observed_count"] = sum(
+            row[f"{name}_patch_count"] > 0 for name in ("rul", "rml", "rll", "lul", "lll")
+        )
         scan_records.append(row)
     scan_scores = pd.DataFrame(scan_records)
-    patient_scores = (
-        scan_scores.groupby("patient_id", as_index=False)
-        .agg(
-            split=("split", "first"),
-            scan_count=("scan_id", "nunique"),
-            patch_count=("patch_count", "sum"),
-            anomaly_mean=("anomaly_mean", "mean"),
-            anomaly_p90=("anomaly_p90", "mean"),
-            anomaly_p95=("anomaly_p95", "mean"),
-            anomaly_max=("anomaly_max", "max"),
-        )
+    patient_scores = scan_scores.groupby("patient_id", as_index=False).agg(
+        split=("split", "first"),
+        scan_count=("scan_id", "nunique"),
+        patch_count=("patch_count", "sum"),
+        anomaly_mean=("anomaly_mean", "mean"),
+        anomaly_p90=("anomaly_p90", "mean"),
+        anomaly_p95=("anomaly_p95", "mean"),
+        anomaly_max=("anomaly_max", "max"),
     )
     patient_scores["data_status"] = "REAL_CT_PATCH_INFERENCE_UNVALIDATED"
     for name in ("rul", "rml", "rll", "lul", "lll"):
-        patient_scores[f"{name}_anomaly_mean"] = scan_scores.groupby("patient_id")[f"{name}_anomaly_mean"].mean().reindex(patient_scores["patient_id"]).to_numpy()
-        patient_scores[f"{name}_anomaly_p90"] = scan_scores.groupby("patient_id")[f"{name}_anomaly_p90"].mean().reindex(patient_scores["patient_id"]).to_numpy()
-        patient_scores[f"{name}_patch_count"] = scan_scores.groupby("patient_id")[f"{name}_patch_count"].sum().reindex(patient_scores["patient_id"]).to_numpy()
+        patient_scores[f"{name}_anomaly_mean"] = (
+            scan_scores.groupby("patient_id")[f"{name}_anomaly_mean"]
+            .mean()
+            .reindex(patient_scores["patient_id"])
+            .to_numpy()
+        )
+        patient_scores[f"{name}_anomaly_p90"] = (
+            scan_scores.groupby("patient_id")[f"{name}_anomaly_p90"]
+            .mean()
+            .reindex(patient_scores["patient_id"])
+            .to_numpy()
+        )
+        patient_scores[f"{name}_patch_count"] = (
+            scan_scores.groupby("patient_id")[f"{name}_patch_count"]
+            .sum()
+            .reindex(patient_scores["patient_id"])
+            .to_numpy()
+        )
 
     for frame, filename in (
         (scan_scores, "scan_anomaly_scores.csv"),
@@ -252,7 +279,9 @@ def score_real_patches(
         temp.replace(path)
     logger.info(
         "Scored %d real patches from %d scans and %d patients. Scores are unvalidated research outputs.",
-        len(patch_scores), len(scan_scores), len(patient_scores)
+        len(patch_scores),
+        len(scan_scores),
+        len(patient_scores),
     )
     return patch_scores, scan_scores, patient_scores
 
@@ -271,7 +300,9 @@ def main() -> None:
         help="Run real patch inference and write patch/scan/patient scores; no clinical labels are inferred.",
     )
     parser.add_argument("--shards-dir", type=Path, default=Path("data/processed/ctrate_lean/test"))
-    parser.add_argument("--encoder-ckpt", type=Path, default=Path("outputs/real/checkpoints/encoder_best.pt"))
+    parser.add_argument(
+        "--encoder-ckpt", type=Path, default=Path("outputs/real/checkpoints/encoder_best.pt")
+    )
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--density-type", choices=["gmm", "flow"], default="gmm")
