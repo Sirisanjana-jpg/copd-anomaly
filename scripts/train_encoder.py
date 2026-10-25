@@ -62,9 +62,25 @@ def train_contrastive_encoder(
         device_obj = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Training 3D contrastive encoder on device: %s", device_obj)
 
-    model = ResNet3DEncoder(in_channels=1, base_filters=16, embedding_dim=128, projection_dim=64).to(
-        device_obj
-    )
+    dataset = None
+    input_channels = 1
+    if not dry_run:
+        assert shards_dir is not None
+        dataset = ShardedPatchDataset(shards_dir)
+        if len(dataset) < batch_size:
+            raise ValueError(
+                f"Only {len(dataset)} patches are available; at least batch_size={batch_size} "
+                "are required. No checkpoint was written."
+            )
+        sample_patch, _ = dataset[0]
+        input_channels = int(sample_patch.shape[0])
+        if input_channels not in (1, 2):
+            raise ValueError(f"Expected 1-channel inhale or 2-channel paired patch; got {input_channels}.")
+        logger.info("Patch dataset has %d samples and %d input channel(s).", len(dataset), input_channels)
+
+    model = ResNet3DEncoder(
+        in_channels=input_channels, base_filters=16, embedding_dim=128, projection_dim=64
+    ).to(device_obj)
     criterion = NTXentLoss(temperature=temperature).to(device_obj)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     dual_transform = ContrastiveDualViewTransform()
@@ -95,12 +111,7 @@ def train_contrastive_encoder(
             logger.info("Synthetic dry-run step %d/5 - loss %.4f", step + 1, loss.item())
     else:
         assert shards_dir is not None
-        dataset = ShardedPatchDataset(shards_dir)
-        if len(dataset) < batch_size:
-            raise ValueError(
-                f"Only {len(dataset)} patches are available; at least batch_size={batch_size} "
-                "are required. No checkpoint was written."
-            )
+        assert dataset is not None
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         if len(loader) == 0:
             raise ValueError("No complete training batches are available; no checkpoint was written.")
@@ -114,6 +125,11 @@ def train_contrastive_encoder(
             missing = required - checkpoint.keys()
             if missing:
                 raise ValueError(f"Resume checkpoint is incomplete; missing: {sorted(missing)}")
+            if int(checkpoint.get("in_channels", 1)) != input_channels:
+                raise ValueError(
+                    f"Resume checkpoint expects {checkpoint.get('in_channels')} input channels, "
+                    f"but current patches have {input_channels}."
+                )
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
