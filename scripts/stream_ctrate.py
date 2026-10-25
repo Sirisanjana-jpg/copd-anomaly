@@ -380,20 +380,24 @@ def main() -> None:
     )
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
-    summary = stream_ctrate(
-        train_metadata_path=args.train_metadata,
-        valid_metadata_path=args.valid_metadata,
-        output_dir=args.output_dir,
-        tier=args.tier,
-        repo_id=args.repo_id,
-        patch_size=args.patch_size,
-        max_patches_per_scan=args.max_patches_per_scan,
-        shard_size=args.shard_size,
-        seed=args.seed,
-        temp_dir=args.temp_dir,
-        max_volumes_per_split=args.max_volumes_per_split,
-        resume=args.resume,
-    )
+    try:
+        summary = stream_ctrate(
+            train_metadata_path=args.train_metadata,
+            valid_metadata_path=args.valid_metadata,
+            output_dir=args.output_dir,
+            tier=args.tier,
+            repo_id=args.repo_id,
+            patch_size=args.patch_size,
+            max_patches_per_scan=args.max_patches_per_scan,
+            shard_size=args.shard_size,
+            seed=args.seed,
+            temp_dir=args.temp_dir,
+            max_volumes_per_split=args.max_volumes_per_split,
+            resume=args.resume,
+        )
+    except Exception:
+        logger.exception("CT-RATE streaming terminated with an error.")
+        raise
     logger.info("Patch extraction summary: %s", summary)
 
 
