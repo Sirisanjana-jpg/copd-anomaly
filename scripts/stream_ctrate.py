@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import traceback
 
 import pandas as pd
 
@@ -45,6 +46,11 @@ def _load_resume_writer(
         existing = (
             pd.read_parquet(manifest_path) if manifest_path.is_file() else pd.read_csv(csv_path)
         )
+        if existing.empty and existing_shards:
+            raise RuntimeError(
+                f"Shard files exist under {output_dir}, but the manifest is empty. "
+                "This may be an interrupted write; inspect the files before resuming."
+            )
         if not existing.empty:
             required = {"scan_id", "shard_name", "index_in_shard"}
             missing = required - set(existing.columns)
@@ -52,9 +58,18 @@ def _load_resume_writer(
                 raise ValueError(
                     f"Existing patch manifest is missing required columns: {sorted(missing)}"
                 )
+            manifest_shards = set(existing["shard_name"].astype(str).unique())
+            orphan_shards = {
+                path.name for path in existing_shards if path.name not in manifest_shards
+            }
+            if orphan_shards:
+                raise RuntimeError(
+                    f"Unreferenced shard files found under {output_dir}: {sorted(orphan_shards)[:10]}. "
+                    "A prior write may have been interrupted; inspect or rebuild this split."
+                )
             missing_shards = [
                 name
-                for name in existing["shard_name"].astype(str).unique()
+                for name in manifest_shards
                 if not (output_dir / name).is_file()
             ]
             if missing_shards:
@@ -184,7 +199,16 @@ def stream_ctrate(
         )
         writer, completed_scans = _load_resume_writer(split_dir, shard_size, resume)
         log_path = split_dir / "stream_log.csv"
-        prior_log = pd.read_csv(log_path) if log_path.is_file() else pd.DataFrame()
+        if log_path.is_file():
+            try:
+                prior_log = pd.read_csv(log_path)
+            except (pd.errors.ParserError, UnicodeDecodeError) as exc:
+                raise RuntimeError(
+                    f"Streaming log is corrupt or incomplete: {log_path}. "
+                    "Back it up, repair/remove the incomplete final row, then resume."
+                ) from exc
+        else:
+            prior_log = pd.DataFrame()
         completed_without_patches = set()
         if not prior_log.empty and {"scan_id", "status"}.issubset(prior_log.columns):
             completed_without_patches = set(
@@ -232,7 +256,10 @@ def stream_ctrate(
                         "volume_name": volume_name,
                         "status": "failed",
                         "patch_count": 0,
-                        "error": str(exc),
+                        "error": (
+                            f"exception={type(exc).__name__}; message={exc}\n"
+                            f"{traceback.format_exc()}"
+                        ),
                     },
                 )
                 logger.exception(
