@@ -122,3 +122,22 @@ def test_synthetic_artifacts_cannot_be_written_under_real_outputs(tmp_path: Path
             output_report_path=tmp_path / "outputs" / "real" / "proxy.csv",
             dry_run=True,
         )
+
+
+def test_training_can_be_required_to_use_cuda(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="CUDA is required"):
+        train_contrastive_encoder(
+            checkpoint_dir=tmp_path / "synthetic",
+            dry_run=True,
+            device="cpu",
+            require_cuda=True,
+        )
+
+
+def test_training_rejects_invalid_checkpoint_interval() -> None:
+    with pytest.raises(ValueError, match="checkpoint_every_steps must be"):
+        train_contrastive_encoder(
+            checkpoint_dir=Path("outputs/synthetic/checkpoints"),
+            dry_run=True,
+            checkpoint_every_steps=0,
+        )
