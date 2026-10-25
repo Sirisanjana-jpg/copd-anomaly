@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import time
 
 import pandas as pd
 import torch
@@ -162,6 +163,7 @@ def train_contrastive_encoder(
                 )
 
         for epoch in range(start_epoch, epochs):
+            epoch_started = time.perf_counter()
             model.train()
             total_loss = 0.0
             n_batches = 0
