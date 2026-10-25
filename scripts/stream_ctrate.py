@@ -156,6 +156,7 @@ def stream_ctrate(
         "patch_size": patch_size,
         "max_patches_per_scan": max_patches_per_scan,
         "shard_size": shard_size,
+        "max_volumes_per_split": max_volumes_per_split,
         "source_train_metadata": str(train_metadata_path),
         "source_valid_metadata": str(valid_metadata_path),
         "note": "CT-RATE report labels are proxy labels; this script does not establish clinical normality.",
