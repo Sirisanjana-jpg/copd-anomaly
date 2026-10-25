@@ -45,8 +45,8 @@ def test_split_leakage_is_rejected() -> None:
 def test_streaming_requires_token_before_file_or_network_access(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.delenv("HF_READ", raising=False)
+    monkeypatch.setenv("HF_TOKEN", "")
+    monkeypatch.setenv("HF_READ", "")
     with pytest.raises(EnvironmentError, match="CT-RATE access token not found"):
         stream_ctrate(
             train_metadata_path=tmp_path / "missing_train.csv",
