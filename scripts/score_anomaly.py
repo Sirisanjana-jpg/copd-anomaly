@@ -195,7 +195,10 @@ def score_real_patches(
     output_dir.mkdir(parents=True, exist_ok=True)
     split_name = shards_dir.name.lower()
     if split_name not in {"train", "val", "test"}:
-        logger.warning("Shard directory name %r is not train/val/test; evaluation must reject this split.", split_name)
+        logger.warning(
+            "Shard directory name %r is not train/val/test; evaluation must reject this split.",
+            split_name,
+        )
     patch_scores = dataset.manifest.copy().reset_index(drop=True)
     patch_scores["split"] = split_name
     patch_scores["anomaly_score"] = scores.astype(float)
