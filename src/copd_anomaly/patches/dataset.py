@@ -218,6 +218,21 @@ class ShardedPatchDataset(Dataset):
             raise FileNotFoundError(
                 f"Patch manifest references missing shard files: {missing_shards[:10]}."
             )
+        for column in ("lung_fraction", "volume_weight", "laa950_fraction"):
+            numeric_values = pd.to_numeric(self.manifest[column], errors="coerce").to_numpy(
+                dtype=np.float64
+            )
+            if not np.isfinite(numeric_values).all():
+                raise ValueError(f"Patch manifest column {column!r} contains non-numeric or non-finite values.")
+        if not self.manifest["lung_fraction"].between(0.0, 1.0).all():
+            raise ValueError("Patch manifest lung_fraction values must be within [0, 1].")
+        if not self.manifest["laa950_fraction"].between(0.0, 1.0).all():
+            raise ValueError("Patch manifest laa950_fraction values must be within [0, 1].")
+        if (self.manifest["volume_weight"] <= 0.0).any():
+            raise ValueError("Patch manifest volume_weight values must be positive.")
+        lobe_ids = set(pd.to_numeric(self.manifest["lobe_id"], errors="coerce").dropna().astype(int))
+        if not lobe_ids.issubset({-1, 1, 2, 3, 4, 5}):
+            raise ValueError(f"Patch manifest contains unsupported lobe IDs: {sorted(lobe_ids)}.")
         if self.manifest["patch_id"].astype(str).duplicated().any():
             raise ValueError("Patch manifest contains duplicate patch_id values.")
         if self.manifest.duplicated(subset=["shard_name", "index_in_shard"]).any():
