@@ -448,7 +448,8 @@ def train_contrastive_encoder(
                 avg_loss,
                 epoch_seconds,
             )
-            if avg_loss < best_loss:
+            is_best = avg_loss < best_loss
+            if is_best:
                 best_loss = avg_loss
             payload = make_checkpoint_payload(
                 epoch,
@@ -457,7 +458,7 @@ def train_contrastive_encoder(
                 running_loss=total_loss,
                 running_batches=n_batches,
             )
-            if avg_loss <= best_loss:
+            if is_best:
                 _atomic_torch_save(payload, checkpoint_dir / "encoder_best.pt")
             _atomic_torch_save(payload, checkpoint_dir / "encoder_latest.pt")
             history_path = checkpoint_dir / "training_history.csv"
