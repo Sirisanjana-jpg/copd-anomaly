@@ -1,6 +1,6 @@
 # COPD-Anomaly: Deep Anomaly-Based Assessment of Chest CT & Lobe-Wise Exacerbation Risk
 
-[![CI](https://github.com/placeholder/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/placeholder/copd-anomaly/actions/workflows/ci.yml)
+[![CI](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml)
 [![Python 3.10 | 3.11](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![License: TODO](https://img.shields.io/badge/license-TODO-yellow.svg)](#license--terms)
 
@@ -85,7 +85,7 @@ copd-anomaly/
 
 ```powershell
 # 1. Clone repository and navigate to workspace
-git clone https://github.com/placeholder/copd-anomaly.git
+git clone https://github.com/Sirisanjana-jpg/copd-anomaly.git
 cd copd-anomaly
 
 # 2. Set up virtual environment and install dependencies
@@ -122,10 +122,11 @@ python scripts/compute_prm.py
 python scripts/lobe_analysis.py
 ```
 
-### 3.3 Heavy Compute: Kaggle & Colab Workflows
+### 3.3 CT-RATE Streaming & GPU Training
 
-- **Phase A (CPU Streaming & Sharding)**: Open [`notebooks/kaggle_phaseA_cpu_stream.ipynb`](file:///c:/Users/siris/copd-anomaly/notebooks/kaggle_phaseA_cpu_stream.ipynb) with CPU accelerator. Streams single volumes from CT-RATE, resamples to isotropic 1.0mm, extracts $50^3$ patches, writes uint8 shards, **deletes volume**, and uploads shards to your private dataset.
-- **Phase B (GPU Training)**: Open [`notebooks/kaggle_phaseB_gpu_train.ipynb`](file:///c:/Users/siris/copd-anomaly/notebooks/kaggle_phaseB_gpu_train.ipynb) with GPU accelerator (T4/P100). Loads patch shards, trains the 3D contrastive encoder, fits normal-lung density models, and outputs anomaly checkpoints.
+Use the repository's resumable streaming CLI to prepare patient-disjoint CT-RATE patch shards, then train on the training split only. See [`docs/REAL_TRAINING_RUNBOOK.md`](docs/REAL_TRAINING_RUNBOOK.md) for the gated-access setup, one-volume smoke run, split outputs, resumable training commands, and current limitations.
+
+The streaming CLI uses threshold lung segmentation as a provisional baseline; inspect the masks and patch counts before a long GPU run. Real patient-level anomaly scoring and held-out evaluation are not yet implemented end-to-end. Do not treat successful pretraining or density fitting as evidence of diagnostic performance.
 
 ---
 
