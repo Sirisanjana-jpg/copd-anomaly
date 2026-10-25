@@ -145,7 +145,6 @@ def test_training_rejects_invalid_checkpoint_interval() -> None:
         )
 
 
-
 def test_density_refuses_partial_epoch_recovery_checkpoint(tmp_path: Path) -> None:
     shards_dir = tmp_path / "shards"
     writer = ShardedPatchWriter(shards_dir, shard_size=2)
