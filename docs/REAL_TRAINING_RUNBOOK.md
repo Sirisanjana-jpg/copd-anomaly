@@ -36,7 +36,7 @@ Outputs are stored in separate directories:
 - `data/processed/ctrate_smoke/val/`
 - `data/processed/ctrate_smoke/test/`
 
-Each split contains `patch_manifest.parquet`, shard files, `selected_volumes.csv`, `selected_patient_ids.txt`, and `stream_log.csv`. Review `patch_counts.json`, `stream_config.json`, and all `failed` / `no_patches` log rows. The current code filters training density candidates by LAA-950 only; this is a heuristic, not the full CT-RATE report-negative normality definition described in the project plan.
+Each split contains `patch_manifest.parquet`, shard files, `selected_volumes.csv`, `selected_patient_ids.txt`, and `stream_log.csv`. Review `patch_counts.json`, `stream_config.json`, `stream_summary.json`, and all `failed` / `no_patches` log rows. Failed rows include the exception type, stage, message, and traceback; the summary lists per-split status counts and failed volume names. The current code filters training density candidates by LAA-950 only; this is a heuristic, not the full CT-RATE report-negative normality definition described in the project plan.
 
 ## 2. Stream the intended cohort
 
@@ -50,7 +50,17 @@ The stream CLI saves manifests after each successfully processed scan and record
 
 **Do not use `scripts/make_patches.py` for CT-RATE pretraining.** That script currently scans DIR-Lab-style filenames matching `*_insp.nii.gz`; it is intended for DIR-Lab paired-scan work and QC, not for the CT-RATE cohort.
 
-## 3. Train the encoder
+## 3. Preflight the shards before training
+
+Run the diagnostic script after the complete cohort has been streamed and reviewed. It checks package availability, free disk space, manifest/shard integrity, referenced indices, sample patch shapes, CUDA access if requested, and checkpoint-directory writability. It does not start training.
+
+```powershell
+python scripts/diagnose_training.py --shards-dir data/processed/ctrate_lean/train --checkpoint-dir outputs/real/checkpoints --require-cuda --report outputs/real/preflight_report.json
+```
+
+If using CPU intentionally, omit `--require-cuda`. Do not proceed if the report status is `failed`; inspect the listed errors first.
+
+## 4. Train the encoder
 
 Train only on the `train` shards, not the validation/test shards. Start with a short run to catch memory/shape issues; then choose the intended epoch count before a long run. A 3D encoder run may take many hours to days depending on GPU, patch count and I/O.
 
@@ -61,7 +71,7 @@ python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --
 The script detects whether patches have one input channel or paired channels and writes:
 - `outputs/real/checkpoints/encoder_best.pt` — best epoch by training contrastive loss
 - `outputs/real/checkpoints/encoder_latest.pt` — latest epoch, optimizer/scheduler state, and history for resuming
-- `outputs/real/checkpoints/training_history.csv` — per-epoch loss and batch count
+- `outputs/real/checkpoints/training_history.csv` — per-epoch loss, batch count, and elapsed seconds
 
 If interrupted, resume using the **same total epoch count and settings**:
 
@@ -71,7 +81,7 @@ python scripts/train_encoder.py --shards-dir data/processed/ctrate_lean/train --
 
 Use `--device cuda` only when CUDA is available. Reduce batch size if GPU memory is insufficient; keep batch size at least 2 for NT-Xent. Archive the code commit, selected patient IDs, shard manifests, environment/package versions, GPU model, seed and training history.
 
-## 4. Fit the density model
+## 5. Fit the density model
 
 Fit the density estimator only from eligible patches in the training split:
 
@@ -81,7 +91,7 @@ python scripts/fit_density.py --shards-dir data/processed/ctrate_lean/train --en
 
 Check how many patches pass the LAA-950 filter before interpreting the result. If too few eligible patches remain, do not silently loosen the threshold; document a scientifically justified selection rule and rerun with a fresh, versioned output.
 
-## 5. Current pipeline boundary
+## 6. Current pipeline boundary
 
 Real patient-level scoring and held-out proxy evaluation are **not implemented end-to-end yet**. The scoring script intentionally fails rather than writing an empty or fabricated real report. Successful encoder training and density fitting alone are not evidence of diagnostic performance. Next work is to implement real patch inference, patient-level aggregation, held-out report-label proxy evaluation, and validated lobe mapping.
 
