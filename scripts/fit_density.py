@@ -125,7 +125,14 @@ def fit_density_estimator(
             )
         loader = DataLoader(dataset, batch_size=32, shuffle=False)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        checkpoint = torch.load(encoder_ckpt, map_location=device, weights_only=False)
+        try:
+            checkpoint = torch.load(encoder_ckpt, map_location=device, weights_only=False)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Cannot load encoder checkpoint {encoder_ckpt}; it may be truncated or corrupt: {exc}"
+            ) from exc
+        if not isinstance(checkpoint, dict):
+            raise ValueError(f"Encoder checkpoint must contain a dictionary: {encoder_ckpt}")
         if checkpoint.get("training_mode") != "real_patch_training":
             raise ValueError(
                 "Refusing an encoder checkpoint without explicit real_patch_training provenance. "
@@ -202,15 +209,19 @@ def main() -> None:
         "--dry-run", action="store_true", help="Fit on random embeddings; not research output"
     )
     args = parser.parse_args()
-    fit_density_estimator(
-        shards_dir=args.shards_dir,
-        encoder_ckpt=args.encoder_ckpt,
-        output_model_path=args.output_model,
-        model_type=args.model_type,
-        n_components=args.components,
-        dry_run=args.dry_run,
-        seed=args.seed,
-    )
+    try:
+        fit_density_estimator(
+            shards_dir=args.shards_dir,
+            encoder_ckpt=args.encoder_ckpt,
+            output_model_path=args.output_model,
+            model_type=args.model_type,
+            n_components=args.components,
+            dry_run=args.dry_run,
+            seed=args.seed,
+        )
+    except Exception:
+        logger.exception("Density fitting terminated with an error.")
+        raise
 
 
 if __name__ == "__main__":
