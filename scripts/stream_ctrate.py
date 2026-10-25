@@ -120,12 +120,35 @@ def stream_ctrate(
         "source_valid_metadata": str(valid_metadata_path),
         "note": "CT-RATE report labels are proxy labels; this script does not establish clinical normality.",
     }
-    (output_dir / "stream_config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    config_path = output_dir / "stream_config.json"
+    if config_path.is_file():
+        if not resume:
+            raise FileExistsError(
+                f"Existing stream config found at {config_path}; use --resume or choose a fresh output directory."
+            )
+        previous_config = json.loads(config_path.read_text(encoding="utf-8"))
+        if previous_config != config:
+            raise ValueError(
+                "Resume configuration differs from the existing stream_config.json. "
+                "Use a fresh output directory when changing tier, seed, repository, or extraction settings."
+            )
+    else:
+        config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     for split_name, split_frame in splits.items():
         split_dir = output_dir / split_name
         split_dir.mkdir(parents=True, exist_ok=True)
-        split_frame.to_csv(split_dir / "selected_volumes.csv", index=False)
+        selected_path = split_dir / "selected_volumes.csv"
+        if selected_path.is_file():
+            previous_selection = pd.read_csv(selected_path)
+            current_selection = split_frame.reset_index(drop=True)
+            if not previous_selection.equals(current_selection):
+                raise ValueError(
+                    f"Selected cohort for {split_name} differs from the saved selection. "
+                    "Use a fresh output directory rather than mixing cohorts."
+                )
+        else:
+            split_frame.to_csv(selected_path, index=False)
         (split_dir / "selected_patient_ids.txt").write_text(
             "\n".join(sorted(split_frame["patient_id"].astype(str).unique())) + "\n",
             encoding="utf-8",
