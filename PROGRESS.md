@@ -15,8 +15,8 @@
 | Density fitting | Implementation present; depends on a real trained encoder and eligible real patches | Fit only on defined normal training patches; report counts and cohort selection |
 | Real anomaly inference / proxy evaluation | Patch/scan/patient scoring and held-out proxy evaluator implemented; not run or validated on real data | Run inference on held-out real shards; provide a reviewed report-label table with a pre-specified extraction rule; audit outputs, patient joins, and held-out metrics |
 | Lobe feature analysis | Real patch-score input path implemented; not validated on real data | Generate masks, extract patches with lobe IDs, score them, and run `scripts/lobe_analysis.py`; verify all five lobes are covered per scan |
-| Synthetic multimodal / exacerbation ablations | Synthetic software tests only | Never present as clinical evidence; requires a real labelled cohort for clinical claims |
-| Publication readiness | **Blocked** | Clean CI, reproducible real-data pipeline, cohort-level leakage checks, validated registration/segmentation and held-out evaluation |
+| Synthetic multimodal / exacerbation ablations | **Out of scope for the imaging paper** | Do not spend publication-critical effort here; never present synthetic results as scientific evidence |
+| Publication readiness | **Blocked** | Follow `docs/PUBLICATION_SCOPE.md`: clean CI, real-data pipeline, segmentation/geometry QC, patient-disjoint splits, held-out anomaly scores, whole-lung vs five-lobe comparisons, baselines and uncertainty reporting |
 
 ## Provenance rules
 
@@ -34,9 +34,10 @@
 3. Generate and QC real patch shards; ensure patient-level split integrity and document selection.
 4. Train encoder on real patches; save reproducible config and loss history. Training may take 1–2 days depending on GPU, data volume and patch count.
 5. Fit density model only from eligible training-set embeddings.
-6. Run real patch scoring and patient-level aggregation; validate held-out report-label proxy evaluation with a reviewed label table and never describe it as clinical diagnosis.
+6. Run real patch scoring and patient-level aggregation on held-out real scans.
 7. Run five-lobe segmentation and lobe-aware patch extraction, then verify missing-lobe handling and per-lobe coverage.
-8. Keep clinical/exacerbation modeling blocked until a real cohort with outcome labels is available.
+8. Compare whole-lung scores, five-lobe summaries, and a pre-specified imaging baseline on held-out patients; add uncertainty and robustness checks.
+9. Prepare reproducible figures, tables, configuration, and limitations. Clinical/exacerbation modeling is outside this paper’s scope, not a release blocker.
 
 ## Verification log
 
@@ -64,4 +65,5 @@ Update this file only when a result is reproducibly verified; include command, d
 - Added real patch anomaly scoring with scan/patient aggregation, optional GMM/flow scoring, and held-out report-label proxy evaluation. Scores are marked `REAL_CT_PATCH_INFERENCE_UNVALIDATED`; metrics are labelled report-label proxy, not clinical diagnosis.
 - Updated registration to preserve NIfTI origin/direction and reject implicit shape-mismatch resampling, which would invalidate landmark comparisons.
 - Added `docs/CLOUD_RUNTIME.md` describing path-based Colab/Kaggle execution and `docs/KAGGLE_REAL_DATA_SMOKE.md` for Kaggle smoke validation.
-- Still blocked externally: clinical exacerbation prediction requires a suitable approved cohort with longitudinal, timestamped exacerbation outcomes, baseline covariates, follow-up/censoring information, and an agreed index date. CT-RATE report-label proxy evaluation still requires a reviewed, reproducible report-label extraction table and a successful held-out real-data run. No code change can manufacture this evidence.
+- Publication scope is narrowed to imaging-based anomaly quantification and five-lobe analysis; see `docs/PUBLICATION_SCOPE.md`. Exacerbation prediction, clinical outcome modeling, and multimodal fusion are out of scope for this paper.
+- A CT-RATE report-label proxy analysis is optional and secondary only; it requires a reviewed, reproducible label-extraction table and a held-out real-data run, and cannot be described as clinical diagnosis.
