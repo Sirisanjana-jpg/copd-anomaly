@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from copd_anomaly.features.lobe_builder import LobeFeatureBuilder
 from copd_anomaly.interfaces import PatchRecord
+from copd_anomaly.patches.dataset import ShardedPatchWriter
 from scripts.fit_density import fit_density_estimator
 from scripts.lobe_analysis import run_lobe_analysis
 from scripts.score_anomaly import score_and_evaluate
@@ -141,3 +143,41 @@ def test_training_rejects_invalid_checkpoint_interval() -> None:
             dry_run=True,
             checkpoint_every_steps=0,
         )
+
+
+
+def test_density_refuses_partial_epoch_recovery_checkpoint(tmp_path: Path) -> None:
+    shards_dir = tmp_path / "shards"
+    writer = ShardedPatchWriter(shards_dir, shard_size=2)
+    record = PatchRecord(
+        patch_id="patch-1",
+        patient_id="patient-1",
+        scan_id="scan-1",
+        center_zyx=(2, 2, 2),
+        lobe_id=None,
+        lung_fraction=0.9,
+        volume_weight=1.0,
+        laa950_fraction=0.0,
+    )
+    writer.add_patches(np.zeros((1, 1, 8, 8, 8), dtype=np.uint8), [record])
+    writer.close()
+    encoder_path = tmp_path / "encoder_latest.pt"
+    encoder_path.touch()
+
+    with patch(
+        "scripts.fit_density.torch.load",
+        return_value={
+            "training_mode": "real_patch_training",
+            "epoch_complete": False,
+            "trained_steps": 25,
+        },
+    ):
+        with pytest.raises(ValueError, match="mid-epoch recovery point"):
+            fit_density_estimator(
+                shards_dir=shards_dir,
+                encoder_ckpt=encoder_path,
+                output_model_path=tmp_path / "density.joblib",
+                n_components=1,
+            )
+
+    assert not (tmp_path / "density.joblib").exists()
