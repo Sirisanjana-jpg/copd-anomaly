@@ -164,6 +164,7 @@ class CTRATEStreamer:
         temp_dir: str | Path = "data/interim/ctrate_temp",
         patch_size: int = 50,
         max_patches_per_scan: int = 100,
+        use_lobe_segmentation: bool = False,
     ) -> None:
         self.repo_id = repo_id
         self.temp_dir = Path(temp_dir)
@@ -171,7 +172,10 @@ class CTRATEStreamer:
         self.patch_size = patch_size
         self.max_patches_per_scan = max_patches_per_scan
         self.sampler = UniformLungPatchSampler(patch_size=patch_size)
-        self.segmenter = LungSegmenter(backend="threshold")
+        self.use_lobe_segmentation = use_lobe_segmentation
+        self.segmenter = LungSegmenter(
+            backend="totalsegmentator" if use_lobe_segmentation else "threshold"
+        )
 
     def stream_and_process_scan(
         self,
@@ -240,24 +244,29 @@ class CTRATEStreamer:
             spacing_zyx = (1.0, 1.0, 1.0)
 
             stage = "segmentation"
-            mask = self.segmenter.segment(vol_zyx, spacing_zyx)
+            mask = (
+                self.segmenter.segment_lobes(vol_zyx, spacing_zyx)
+                if self.use_lobe_segmentation
+                else self.segmenter.segment(vol_zyx, spacing_zyx)
+            )
             if mask.shape != vol_zyx.shape:
                 raise ValueError(
                     f"Mask shape {mask.shape} does not match CT shape {vol_zyx.shape}."
                 )
             if not np.isfinite(mask).all() or not np.any(mask > 0):
                 raise ValueError("Lung segmentation returned an empty or non-finite mask.")
-            mask_fraction = float(np.mean(mask > 0))
+            lung_mask = (mask > 0).astype(np.uint8)
+            mask_fraction = float(np.mean(lung_mask > 0))
             if not 0.01 <= mask_fraction <= 0.65:
                 raise ValueError(
                     f"Implausible lung-mask fraction {mask_fraction:.3f}; expected 0.01–0.65. "
                     "Inspect HU scaling and threshold segmentation before accepting this scan."
                 )
             touches_xy_border = bool(
-                np.any(mask[:, 0, :])
-                or np.any(mask[:, -1, :])
-                or np.any(mask[:, :, 0])
-                or np.any(mask[:, :, -1])
+                np.any(lung_mask[:, 0, :])
+                or np.any(lung_mask[:, -1, :])
+                or np.any(lung_mask[:, :, 0])
+                or np.any(lung_mask[:, :, -1])
             )
             if touches_xy_border:
                 raise ValueError(
@@ -268,13 +277,14 @@ class CTRATEStreamer:
                 "%s: lung-mask fraction=%.3f, voxels=%d",
                 volume_name,
                 mask_fraction,
-                int(np.count_nonzero(mask)),
+                int(np.count_nonzero(lung_mask)),
             )
             stage = "patch_extraction"
             patches, records = self.sampler.extract_patches(
                 volume_insp=vol_zyx,
                 volume_exp=None,
-                lung_mask=mask,
+                lung_mask=lung_mask,
+                lobe_mask=mask if self.use_lobe_segmentation else None,
                 max_patches_per_scan=self.max_patches_per_scan,
                 patient_id=patient_id,
                 scan_id=volume_name.split(".")[0],
