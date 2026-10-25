@@ -50,7 +50,6 @@ def test_streaming_requires_token_before_file_or_network_access(
     assert not (tmp_path / "out").exists()
 
 
-
 def test_invalid_tier_fails_closed() -> None:
     train = pd.DataFrame({"VolumeName": ["train_10001_a_1.nii.gz"]})
     valid = pd.DataFrame({"VolumeName": ["valid_20001_a_1.nii.gz"]})
