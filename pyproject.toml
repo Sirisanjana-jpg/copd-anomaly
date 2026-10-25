@@ -49,9 +49,9 @@ dev = [
     "mypy>=1.8.0",
 ]
 segmentation = [
-    # Optional backends checked dynamically at runtime with licence verification
+    # Optional backends; use explicit backend selection and inspect each generated mask.
     "lungmask>=0.2.16",
-    # "TotalSegmentator>=2.0.0", # Note: Non-commercial/academic license check required
+    "TotalSegmentator>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]
