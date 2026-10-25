@@ -20,10 +20,14 @@ from copd_anomaly.utils.helpers import get_logger
 logger = get_logger("stream_ctrate")
 
 
-def _load_resume_writer(output_dir: Path, shard_size: int, resume: bool) -> tuple[ShardedPatchWriter, set[str]]:
+def _load_resume_writer(
+    output_dir: Path, shard_size: int, resume: bool
+) -> tuple[ShardedPatchWriter, set[str]]:
     manifest_path = output_dir / "patch_manifest.parquet"
     csv_path = output_dir / "patch_manifest.csv"
-    existing_manifest = manifest_path if manifest_path.is_file() else csv_path if csv_path.is_file() else None
+    existing_manifest = (
+        manifest_path if manifest_path.is_file() else csv_path if csv_path.is_file() else None
+    )
     existing_shards = list(output_dir.glob("shard_*.npy"))
     if existing_manifest is None and existing_shards:
         raise FileNotFoundError(
@@ -37,14 +41,19 @@ def _load_resume_writer(output_dir: Path, shard_size: int, resume: bool) -> tupl
     writer = ShardedPatchWriter(output_dir=output_dir, shard_size=shard_size)
     completed_scans: set[str] = set()
     if existing_manifest is not None:
-        existing = pd.read_parquet(manifest_path) if manifest_path.is_file() else pd.read_csv(csv_path)
+        existing = (
+            pd.read_parquet(manifest_path) if manifest_path.is_file() else pd.read_csv(csv_path)
+        )
         if not existing.empty:
             required = {"scan_id", "shard_name", "index_in_shard"}
             missing = required - set(existing.columns)
             if missing:
-                raise ValueError(f"Existing patch manifest is missing required columns: {sorted(missing)}")
+                raise ValueError(
+                    f"Existing patch manifest is missing required columns: {sorted(missing)}"
+                )
             missing_shards = [
-                name for name in existing["shard_name"].astype(str).unique()
+                name
+                for name in existing["shard_name"].astype(str).unique()
                 if not (output_dir / name).is_file()
             ]
             if missing_shards:
@@ -59,7 +68,12 @@ def _load_resume_writer(output_dir: Path, shard_size: int, resume: bool) -> tupl
             if path.stem.split("_")[-1].isdigit()
         ]
         writer.current_shard_idx = max(shard_indices, default=-1) + 1
-        logger.info("Resuming %s with %d existing patches across %d shards.", output_dir, len(writer.all_manifest_records), writer.current_shard_idx)
+        logger.info(
+            "Resuming %s with %d existing patches across %d shards.",
+            output_dir,
+            len(writer.all_manifest_records),
+            writer.current_shard_idx,
+        )
     return writer, completed_scans
 
 
@@ -187,17 +201,31 @@ def stream_ctrate(
                     status = "no_patches"
                 _append_log(
                     log_path,
-                    {"scan_id": scan_id, "patient_id": patient_id, "volume_name": volume_name,
-                     "status": status, "patch_count": count, "error": ""},
+                    {
+                        "scan_id": scan_id,
+                        "patient_id": patient_id,
+                        "volume_name": volume_name,
+                        "status": status,
+                        "patch_count": count,
+                        "error": "",
+                    },
                 )
                 logger.info("%s: status=%s patches=%d", volume_name, status, count)
             except Exception as exc:
                 _append_log(
                     log_path,
-                    {"scan_id": scan_id, "patient_id": patient_id, "volume_name": volume_name,
-                     "status": "failed", "patch_count": 0, "error": str(exc)},
+                    {
+                        "scan_id": scan_id,
+                        "patient_id": patient_id,
+                        "volume_name": volume_name,
+                        "status": "failed",
+                        "patch_count": 0,
+                        "error": str(exc),
+                    },
                 )
-                logger.exception("Failed volume %s; continuing to the next selected volume.", volume_name)
+                logger.exception(
+                    "Failed volume %s; continuing to the next selected volume.", volume_name
+                )
 
         # Finalize any remaining buffer and persist the manifest if at least one patch exists.
         writer.close()
@@ -214,12 +242,16 @@ def stream_ctrate(
             "No training patches were produced. Check the access token, CT-RATE file names, "
             "segmentation output, and patch-size/lung-fraction settings."
         )
-    (output_dir / "patch_counts.json").write_text(json.dumps(split_summary, indent=2), encoding="utf-8")
+    (output_dir / "patch_counts.json").write_text(
+        json.dumps(split_summary, indent=2), encoding="utf-8"
+    )
     return split_summary
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Stream CT-RATE volumes into resumable patch shards.")
+    parser = argparse.ArgumentParser(
+        description="Stream CT-RATE volumes into resumable patch shards."
+    )
     parser.add_argument("--train-metadata", type=Path, required=True)
     parser.add_argument("--valid-metadata", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/ctrate_shards"))
@@ -230,7 +262,12 @@ def main() -> None:
     parser.add_argument("--shard-size", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--temp-dir", type=Path, default=Path("data/interim/ctrate_temp"))
-    parser.add_argument("--max-volumes-per-split", type=int, default=None, help="Optional capped real-data smoke run")
+    parser.add_argument(
+        "--max-volumes-per-split",
+        type=int,
+        default=None,
+        help="Optional capped real-data smoke run",
+    )
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
     summary = stream_ctrate(
