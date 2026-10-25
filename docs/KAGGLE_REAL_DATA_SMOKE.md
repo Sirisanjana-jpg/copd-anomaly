@@ -22,6 +22,7 @@ Run:
 
 ```python
 import os, shutil, sys, torch
+
 print("Python:", sys.version)
 print("CUDA available:", torch.cuda.is_available())
 print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NONE")
@@ -59,6 +60,7 @@ Set these paths to the actual files visible in the Kaggle input pane. Do not gue
 
 ```python
 from pathlib import Path
+
 for root in [Path("/kaggle/input"), Path("/kaggle/working")]:
     if root.exists():
         print(f"\n-- {root} --")
@@ -73,6 +75,7 @@ Example after replacing the paths with verified paths:
 
 ```python
 import pandas as pd
+
 train_meta = "/kaggle/input/APPROVED_INPUT_PATH/train_metadata.csv"
 valid_meta = "/kaggle/input/APPROVED_INPUT_PATH/valid_metadata.csv"
 for p in (train_meta, valid_meta):
@@ -111,6 +114,7 @@ This should be a small real-data data-path check, not a research experiment. A s
 ```python
 from pathlib import Path
 import json
+
 root = Path("/kaggle/working/copd-smoke/ctrate_smoke")
 print("Exists:", root.exists())
 for p in sorted(root.rglob("*")):
