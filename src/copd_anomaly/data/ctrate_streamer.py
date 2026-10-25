@@ -201,7 +201,10 @@ class CTRATEStreamer:
                 )
             logger.info(
                 "%s: isotropic 1 mm grid shape=%s, intensity range=[%.1f, %.1f] HU",
-                volume_name, vol_xyz.shape, intensity_min, intensity_max,
+                volume_name,
+                vol_xyz.shape,
+                intensity_min,
+                intensity_max,
             )
             vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
             spacing_zyx = (1.0, 1.0, 1.0)
