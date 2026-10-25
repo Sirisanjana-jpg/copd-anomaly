@@ -24,6 +24,11 @@ def _load_resume_writer(output_dir: Path, shard_size: int, resume: bool) -> tupl
     manifest_path = output_dir / "patch_manifest.parquet"
     csv_path = output_dir / "patch_manifest.csv"
     existing_manifest = manifest_path if manifest_path.is_file() else csv_path if csv_path.is_file() else None
+    existing_shards = list(output_dir.glob("shard_*.npy"))
+    if existing_manifest is None and existing_shards:
+        raise FileNotFoundError(
+            f"Found shard files in {output_dir} without a manifest. Restore the manifest or choose a fresh directory."
+        )
     if existing_manifest is not None and not resume:
         raise FileExistsError(
             f"Existing patch manifest found at {existing_manifest}; use --resume or choose a fresh output directory."
@@ -38,6 +43,14 @@ def _load_resume_writer(output_dir: Path, shard_size: int, resume: bool) -> tupl
             missing = required - set(existing.columns)
             if missing:
                 raise ValueError(f"Existing patch manifest is missing required columns: {sorted(missing)}")
+            missing_shards = [
+                name for name in existing["shard_name"].astype(str).unique()
+                if not (output_dir / name).is_file()
+            ]
+            if missing_shards:
+                raise FileNotFoundError(
+                    f"Manifest references missing shard files under {output_dir}: {missing_shards[:5]}"
+                )
             writer.all_manifest_records = existing.to_dict(orient="records")
             completed_scans = set(existing["scan_id"].astype(str).unique())
         shard_indices = [
