@@ -42,6 +42,12 @@ def extract_and_shard_patches(
     if not nifti_files:
         raise FileNotFoundError(f"No inspiratory NIfTI scans matched in {nifti_dir} for cases={cases}.")
 
+    existing_manifest = output_dir / "patch_manifest.parquet"
+    if existing_manifest.exists() or (output_dir / "patch_manifest.csv").exists():
+        raise FileExistsError(
+            f"A patch manifest already exists under {output_dir}. Choose a fresh output directory "
+            "to avoid mixing old and new shards."
+        )
     sampler = UniformLungPatchSampler(patch_size=patch_size, min_lung_fraction=0.70)
     writer = ShardedPatchWriter(output_dir=output_dir, shard_size=shard_size)
     total_scans_processed = 0
