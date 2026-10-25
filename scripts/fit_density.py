@@ -79,8 +79,11 @@ def fit_density_estimator(
         loader = DataLoader(dataset, batch_size=32, shuffle=False)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         checkpoint = torch.load(encoder_ckpt, map_location=device, weights_only=False)
-        if checkpoint.get("training_mode") == "synthetic_dry_run":
-            raise ValueError("Refusing synthetic encoder checkpoint for real density fitting.")
+        if checkpoint.get("training_mode") != "real_patch_training":
+            raise ValueError(
+                "Refusing an encoder checkpoint without explicit real_patch_training provenance. "
+                "Legacy checkpoints may have been created by synthetic fallback code; retrain from real shards."
+            )
         if "model_state_dict" not in checkpoint:
             raise ValueError(
                 f"Invalid encoder checkpoint (missing model_state_dict): {encoder_ckpt}"
