@@ -31,7 +31,9 @@ def _scan_id(path: Path) -> str:
     return path.stem
 
 
-def _region_features(values: np.ndarray, spacing_xyz: tuple[float, float, float]) -> dict[str, float]:
+def _region_features(
+    values: np.ndarray, spacing_xyz: tuple[float, float, float]
+) -> dict[str, float]:
     values = np.asarray(values, dtype=np.float32)
     values = values[np.isfinite(values)]
     if values.size == 0:
@@ -54,7 +56,10 @@ def build_lobe_feature_table(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> 
     if not lobe_dir.is_dir():
         raise FileNotFoundError(f"Lobe-mask directory does not exist: {lobe_dir}")
     ct_paths = sorted(
-        p for p in ct_dir.rglob("*") if p.is_file() and (p.name.endswith(".nii.gz") or p.name.endswith(".nii"))
+        p
+        for p in ct_dir.rglob("*")
+        if p.is_file()
+        and (p.name.endswith(".nii.gz") or p.name.endswith(".nii"))
         and not p.name.endswith("_lobes.nii.gz")
     )
     if not ct_paths:
@@ -70,7 +75,9 @@ def build_lobe_feature_table(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> 
         mask_name = f"{scan_id}_lobes.nii.gz"
         mask_path = masks_by_name.get(mask_name)
         if mask_path is None:
-            raise FileNotFoundError(f"Missing lobe mask for {ct_path}: expected a file named {mask_name}.")
+            raise FileNotFoundError(
+                f"Missing lobe mask for {ct_path}: expected a file named {mask_name}."
+            )
         ct_img, mask_img = nib.load(str(ct_path)), nib.load(str(mask_path))
         if ct_img.shape[:3] != mask_img.shape[:3] or not np.allclose(
             ct_img.affine, mask_img.affine, rtol=0.0, atol=1e-3
@@ -78,14 +85,21 @@ def build_lobe_feature_table(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> 
             raise ValueError(f"CT/mask geometry mismatch for scan {scan_id}.")
         ct = ct_img.get_fdata(dtype=np.float32)
         mask_float = mask_img.get_fdata(dtype=np.float32)
-        if ct.ndim != 3 or mask_float.ndim != 3 or not np.isfinite(ct).all() or not np.isfinite(mask_float).all():
+        if (
+            ct.ndim != 3
+            or mask_float.ndim != 3
+            or not np.isfinite(ct).all()
+            or not np.isfinite(mask_float).all()
+        ):
             raise ValueError(f"Invalid 3D CT or mask values for scan {scan_id}.")
         if not np.equal(mask_float, np.round(mask_float)).all():
             raise ValueError(f"Non-integer lobe labels for scan {scan_id}.")
         mask = mask_float.astype(np.uint8)
         present = set(np.unique(mask).astype(int)) - {0}
         if present != set(LOBE_LABELS):
-            raise ValueError(f"Scan {scan_id} must contain lobe labels 1-5; found {sorted(present)}.")
+            raise ValueError(
+                f"Scan {scan_id} must contain lobe labels 1-5; found {sorted(present)}."
+            )
         spacing = tuple(float(v) for v in ct_img.header.get_zooms()[:3])
         relative_parts = ct_path.relative_to(ct_dir).parts
         if len(relative_parts) >= 3:
@@ -111,12 +125,20 @@ def build_lobe_feature_table(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ct-dir", type=Path, required=True, help="CT-RATE NIfTI root; scanned recursively.")
-    parser.add_argument("--lobe-dir", type=Path, required=True, help="Directory containing *_lobes.nii.gz masks.")
-    parser.add_argument("--output-csv", type=Path, default=Path("outputs/real/reports/ct_lobe_feature_table.csv"))
+    parser.add_argument(
+        "--ct-dir", type=Path, required=True, help="CT-RATE NIfTI root; scanned recursively."
+    )
+    parser.add_argument(
+        "--lobe-dir", type=Path, required=True, help="Directory containing *_lobes.nii.gz masks."
+    )
+    parser.add_argument(
+        "--output-csv", type=Path, default=Path("outputs/real/reports/ct_lobe_feature_table.csv")
+    )
     args = parser.parse_args()
     frame = build_lobe_feature_table(args.ct_dir, args.lobe_dir, args.output_csv)
-    print(f"Wrote {len(frame)} scan/lobe rows for {frame['VolumeName'].nunique()} scans to {args.output_csv}")
+    print(
+        f"Wrote {len(frame)} scan/lobe rows for {frame['VolumeName'].nunique()} scans to {args.output_csv}"
+    )
     return 0
 
 
