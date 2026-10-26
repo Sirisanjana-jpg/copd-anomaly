@@ -4,6 +4,7 @@ This is an exploratory, self-supervised pipeline for the small DIR-Lab cohort.
 It does not create a held-out test set and must not be used to claim generalization.
 Raw archives stay under data/ and are never committed by this script.
 """
+
 from __future__ import annotations
 
 import argparse
