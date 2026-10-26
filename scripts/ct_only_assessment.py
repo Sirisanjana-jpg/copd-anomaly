@@ -109,14 +109,14 @@ def extract_features(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> pd.DataF
         labels = labels_float.astype(np.uint8)
         present = set(np.unique(labels).astype(int)) - {0}
         if present != set(LOBE_NAMES):
-            raise ValueError(
-                f"Expected lobe IDs 1-5 for {case_id}; found {sorted(present)}."
-            )
+            raise ValueError(f"Expected lobe IDs 1-5 for {case_id}; found {sorted(present)}.")
         # HU values outside a plausible CT range usually indicate an invalid conversion.
         lung_values = ct[labels > 0]
-        if lung_values.size == 0 or np.percentile(lung_values, 1) < -1200 or np.percentile(
-            lung_values, 99
-        ) > 1500:
+        if (
+            lung_values.size == 0
+            or np.percentile(lung_values, 1) < -1200
+            or np.percentile(lung_values, 99) > 1500
+        ):
             raise ValueError(
                 f"CT intensities for {case_id} do not look like calibrated HU. "
                 "Check the DICOM/NIfTI conversion and rescale slope/intercept."
@@ -130,9 +130,7 @@ def extract_features(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> pd.DataF
         for lobe_id, lobe_name in LOBE_NAMES.items():
             lobe_features = _summarize_region(ct[labels == lobe_id], spacing)
             row.update({f"{lobe_name}_{k}": v for k, v in lobe_features.items()})
-            row[f"{lobe_name}_ct_emphysema_band"] = ct_emphysema_band(
-                lobe_features["laa950_pct"]
-            )
+            row[f"{lobe_name}_ct_emphysema_band"] = ct_emphysema_band(lobe_features["laa950_pct"])
         row["severity_label_scope"] = "CT_EMPHYSEMA_BURDEN_ONLY_NOT_GOLD"
         records.append(row)
 
@@ -173,7 +171,8 @@ def train_labelled_baseline(
     if groups.nunique() < 8:
         raise ValueError("Too few independent patients for a patient-disjoint holdout.")
     feature_cols = [
-        col for col in features.columns
+        col
+        for col in features.columns
         if col not in {"case_id", "ct_path"} and pd.api.types.is_numeric_dtype(features[col])
     ]
     if not feature_cols:
@@ -199,7 +198,8 @@ def train_labelled_baseline(
     predictions = (probabilities >= 0.5).astype(int)
     tn, fp, fn, tp = confusion_matrix(test["copd_label"], predictions, labels=[0, 1]).ravel()
     metrics = {
-        "task": "report_label_proxy_classification" if label_source == "report"
+        "task": "report_label_proxy_classification"
+        if label_source == "report"
         else "spirometry_labelled_internal_holdout",
         "label_source": label_source,
         "n_total_cases": int(len(merged)),
@@ -245,19 +245,31 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Quantify inspiratory CT emphysema features per lung lobe; optional research baseline."
     )
-    parser.add_argument("--ct-dir", type=Path, required=True, help="Directory of calibrated CT .nii.gz files.")
-    parser.add_argument("--lobe-dir", type=Path, required=True, help="Directory of matching *_lobes.nii.gz masks.")
-    parser.add_argument("--output-csv", type=Path, default=Path("outputs/real/reports/ct_lobe_features.csv"))
-    parser.add_argument("--labels-csv", type=Path, help="Optional CSV: case_id,copd_label[,patient_id].")
+    parser.add_argument(
+        "--ct-dir", type=Path, required=True, help="Directory of calibrated CT .nii.gz files."
+    )
+    parser.add_argument(
+        "--lobe-dir", type=Path, required=True, help="Directory of matching *_lobes.nii.gz masks."
+    )
+    parser.add_argument(
+        "--output-csv", type=Path, default=Path("outputs/real/reports/ct_lobe_features.csv")
+    )
+    parser.add_argument(
+        "--labels-csv", type=Path, help="Optional CSV: case_id,copd_label[,patient_id]."
+    )
     parser.add_argument("--label-source", choices=["spirometry", "report"], default=None)
-    parser.add_argument("--model-output-dir", type=Path, default=Path("outputs/real/reports/ct_only_model"))
+    parser.add_argument(
+        "--model-output-dir", type=Path, default=Path("outputs/real/reports/ct_only_model")
+    )
     args = parser.parse_args()
     if bool(args.labels_csv) != bool(args.label_source):
         parser.error("--labels-csv and --label-source must be supplied together.")
     features = extract_features(args.ct_dir, args.lobe_dir, args.output_csv)
     print(f"Wrote CT-only quantitative features for {len(features)} scans to {args.output_csv}")
     if args.labels_csv:
-        metrics = train_labelled_baseline(features, args.labels_csv, args.model_output_dir, args.label_source)
+        metrics = train_labelled_baseline(
+            features, args.labels_csv, args.model_output_dir, args.label_source
+        )
         print(json.dumps(metrics, indent=2))
     else:
         print(
