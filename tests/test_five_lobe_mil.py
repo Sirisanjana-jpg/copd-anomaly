@@ -43,9 +43,7 @@ def test_five_lobe_mil_writes_scan_metrics_and_lobe_hypotheses(tmp_path: Path) -
 
 def test_five_lobe_mil_rejects_incomplete_lobes(tmp_path: Path) -> None:
     feature_path, label_path = tmp_path / "lobes.csv", tmp_path / "labels.csv"
-    pd.DataFrame([{"scan_id": "x", "lobe_id": "LUL", "f0": 1.0}]).to_csv(
-        feature_path, index=False
-    )
+    pd.DataFrame([{"scan_id": "x", "lobe_id": "LUL", "f0": 1.0}]).to_csv(feature_path, index=False)
     pd.DataFrame([{"scan_id": "x", **dict.fromkeys(CTRATE_LABELS, 0)}]).to_csv(
         label_path, index=False
     )
