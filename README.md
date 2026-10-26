@@ -31,13 +31,14 @@ In addition to emphysema-oriented quantitative CT analysis, the repository now i
 
 See the [five-lobe multi-finding research plan](docs/FIVE_LOBE_MULTIFINDING_COPD.md), [multi-label workflow guide](docs/MULTILABEL_CT_FINDINGS.md), and `scripts/train_multilabel_head.py`. The head expects one image-derived embedding vector per CT volume and the matching official CT-RATE label CSV. It does not extract embeddings from raw CT volumes on its own; the image encoder and embedding aggregation pipeline must be run first.
 
-A first weakly supervised spatial baseline is now in `scripts/train_five_lobe_mil.py`. It consumes one numeric feature row per scan and lobe (`lobe_id` values `LUL`, `LLL`, `RUL`, `RML`, `RLL`) plus scan-level CT-RATE labels. It trains a shared per-lobe multi-label head with noisy-OR pooling and exports per-lobe score hypotheses. Example:
+A first weakly supervised spatial baseline is now in `scripts/train_five_lobe_mil.py`. The input bridge `scripts/build_five_lobe_features.py` extracts numeric HU/density features per lobe from CT NIfTI volumes and matching five-lobe masks, producing the long-format table expected by MIL. Example:
 
 ```powershell
-python scripts/train_five_lobe_mil.py --lobe-features-csv outputs/real/reports/lobe_features.csv --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv --output-dir outputs/real/five_lobe_mil
+python scripts/build_five_lobe_features.py --ct-dir data/ctrate_nifti --lobe-dir data/ctrate_lobes --output-csv outputs/real/reports/ct_lobe_feature_table.csv
+python scripts/train_five_lobe_mil.py --lobe-features-csv outputs/real/reports/ct_lobe_feature_table.csv --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv --output-dir outputs/real/five_lobe_mil
 ```
 
-The feature CSV must contain complete five-lobe rows for at least 30 matched scans; features must be numeric image-derived values, not patient identifiers or labels. The current output is weak localization only—not radiologist-validated location.
+Each scan needs exactly five rows (`RUL`, `RML`, `RLL`, `LUL`, `LLL`) and a matching CT-RATE volume name. The extractor validates CT/mask geometry and all five lobe IDs. The MIL model needs at least 30 complete matched scans and 10 patient groups. Its per-lobe outputs are weak localization hypotheses—not radiologist-validated locations.
 
 **Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics therefore measure agreement with those labels, not confirmed disease diagnosis. The model is scan-level and does not localize lesions. Do not describe it as clinically validated.
 
