@@ -9,7 +9,7 @@ For the whole lung and each of the five lobes, `scripts/ct_only_assessment.py` r
 - mean, median, 15th percentile, and standard deviation of CT attenuation (HU);
 - low-attenuation area fractions at ≤ -950 HU and ≤ -910 HU.
 
-LAA-950 is a widely used quantitative emphysema measure on inspiratory CT. Its interpretation depends on CT acquisition/reconstruction, calibration, segmentation, and image quality. The tool checks that input volumes look like calibrated HU and that CT and lobe-mask geometry agree, but these checks do not replace radiology/segmentation quality control.
+LAA-950 is a widely used quantitative emphysema measure on inspiratory CT. Its interpretation depends on CT acquisition/reconstruction, calibration, segmentation, and image quality. The tool checks that input volumes look like calibrated HU and that CT and lobe-mask geometry agree, but these checks do not replace radiology/segmentation quality control.\n\nThe output includes an **exploratory CT emphysema burden band** based on published cohort conventions: below 6% LAA-950, 6% to below 14%, and 14% or higher. These thresholds have appeared in research studies, but are not universal diagnostic cutoffs. The bands are labelled `CT_EMPHYSEMA_BURDEN_ONLY_NOT_GOLD`; they must not be interpreted as GOLD 1–4, a COPD diagnosis, or a validated clinical severity scale. GOLD airflow-obstruction grades depend on post-bronchodilator spirometry, including FEV1/FVC and FEV1 percent predicted. See [GOLD](https://goldcopd.org/2025-gold-report/) and the [GOLD Science Committee recommendations](https://publications.ersnet.org/lookup/doi/10.1183/13993003.01603-2024).
 
 ## Run feature extraction
 
