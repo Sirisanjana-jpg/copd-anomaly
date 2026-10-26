@@ -31,6 +31,14 @@ In addition to emphysema-oriented quantitative CT analysis, the repository now i
 
 See the [five-lobe multi-finding research plan](docs/FIVE_LOBE_MULTIFINDING_COPD.md), [multi-label workflow guide](docs/MULTILABEL_CT_FINDINGS.md), and `scripts/train_multilabel_head.py`. The head expects one image-derived embedding vector per CT volume and the matching official CT-RATE label CSV. It does not extract embeddings from raw CT volumes on its own; the image encoder and embedding aggregation pipeline must be run first.
 
+A first weakly supervised spatial baseline is now in `scripts/train_five_lobe_mil.py`. It consumes one numeric feature row per scan and lobe (`lobe_id` values `LUL`, `LLL`, `RUL`, `RML`, `RLL`) plus scan-level CT-RATE labels. It trains a shared per-lobe multi-label head with noisy-OR pooling and exports per-lobe score hypotheses. Example:
+
+```powershell
+python scripts/train_five_lobe_mil.py --lobe-features-csv outputs/real/reports/lobe_features.csv --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv --output-dir outputs/real/five_lobe_mil
+```
+
+The feature CSV must contain complete five-lobe rows for at least 30 matched scans; features must be numeric image-derived values, not patient identifiers or labels. The current output is weak localization only—not radiologist-validated location.
+
 **Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics therefore measure agreement with those labels, not confirmed disease diagnosis. The model is scan-level and does not localize lesions. Do not describe it as clinically validated.
 
 ## 2. Repository Layout
