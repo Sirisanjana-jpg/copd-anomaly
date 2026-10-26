@@ -49,7 +49,7 @@ def discover_case_archives(data_dir: Path, cases: list[str] | None = None) -> di
                 bad_member = archive.testzip()
                 if bad_member is not None:
                     raise ValueError(f"Corrupt ZIP member {bad_member!r} in {path}")
-                names = [Path(member.filename).name for member in archive.namelist()]
+                names = [Path(member).name for member in archive.namelist()]
                 if not any(name.endswith(".img") and "_iBHCT" in name for name in names):
                     raise ValueError(f"{path} has no DIR-Lab inspiratory *_iBHCT*.img volume.")
                 if not any(name.endswith(".img") and "_eBHCT" in name for name in names):
