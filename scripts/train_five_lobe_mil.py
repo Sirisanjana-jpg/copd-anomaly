@@ -116,7 +116,8 @@ def train_lobe_mil(
         group_ids.append(str(rows[patient_key].iloc[0]) if patient_key else scan_id)
     if len(scans) < 30:
         raise ValueError(f"Only {len(scans)} complete five-lobe scans matched; need at least 30.")
-    x = np.stack(scans)
+    x_raw = np.stack(scans)
+    x = x_raw.copy()
     y = np.stack(target_ids)
     groups = np.asarray(group_ids)
     if len(np.unique(groups)) < 10:
@@ -173,9 +174,42 @@ def train_lobe_mil(
     for k, scan_index in enumerate(test_idx):
         for lobe_idx, lobe in enumerate(LOBE_ORDER):
             row = {"volume_name": valid_ids[scan_index], "lobe_id": lobe}
-            row.update({f"weak_probability__{name}": float(lp[k, lobe_idx, j]) for j, name in enumerate(CTRATE_LABELS)})
+            row.update({
+                f"feature__{name}": float(x_raw[scan_index, lobe_idx, j])
+                for j, name in enumerate(feature_cols)
+            })
+            row.update({
+                f"weak_probability__{name}": float(lp[k, lobe_idx, j])
+                for j, name in enumerate(CTRATE_LABELS)
+            })
             loc_rows.append(row)
     pd.DataFrame(loc_rows).to_csv(output_dir / "holdout_lobe_hypotheses.csv", index=False)
+
+    # Transparent CT structural burden summary; deliberately no single severity score.
+    profile_rows = []
+    for k, scan_index in enumerate(test_idx):
+        lobe_matrix = x_raw[scan_index]
+        feature_index = {name: idx for idx, name in enumerate(feature_cols)}
+        row = {
+            "volume_name": valid_ids[scan_index],
+            "ct_burden_status": "STRUCTURAL_PROFILE_NOT_CLINICAL_SEVERITY",
+            "total_lobe_volume_ml": float(sum(lobe_matrix[:, feature_index["volume_ml"]]))
+            if "volume_ml" in feature_index else None,
+        }
+        if "voxel_count" in feature_index:
+            weights = lobe_matrix[:, feature_index["voxel_count"]].astype(float)
+            if weights.sum() > 0:
+                for feature_name in ("mean_hu", "low_attenuation_pct_le_minus950",
+                                     "low_attenuation_pct_le_minus910"):
+                    if feature_name in feature_index:
+                        values = lobe_matrix[:, feature_index[feature_name]].astype(float)
+                        row[f"voxel_weighted__{feature_name}"] = float(np.average(values, weights=weights))
+        row.update({
+            f"scan_probability__{name}": float(p[k, j])
+            for j, name in enumerate(CTRATE_LABELS)
+        })
+        profile_rows.append(row)
+    pd.DataFrame(profile_rows).to_csv(output_dir / "holdout_scan_burden_profile.csv", index=False)
     report = {
         "task": "five-lobe weakly supervised multi-label CT finding prediction",
         "label_source": "CT-RATE scan/report-level pseudo-labels",
