@@ -20,6 +20,7 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 import yaml
+from nibabel.processing import resample_to_output
 
 CASE_PATTERN = re.compile(r"(copd\d+)", re.IGNORECASE)
 
@@ -75,6 +76,26 @@ def discover_case_archives(data_dir: Path, cases: list[str] | None = None) -> di
 def run_command(command: list[str], repo_root: Path, env: dict[str, str]) -> None:
     print("\n>>>", " ".join(command), flush=True)
     subprocess.run(command, cwd=repo_root, env=env, check=True)
+
+
+def resample_inspiratory_scans(
+    nifti_dir: Path, output_dir: Path, cases: list[str]
+) -> int:
+    """Resample inspiratory CTs to an isotropic 1 mm grid before cubic patch sampling."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for case_id in cases:
+        source = nifti_dir / f"{case_id}_insp.nii.gz"
+        if not source.is_file():
+            raise FileNotFoundError(f"Expected inspiratory NIfTI is missing: {source}")
+        image = nib.load(str(source))
+        resampled = resample_to_output(image, voxel_sizes=(1.0, 1.0, 1.0), order=1)
+        values = resampled.get_fdata(dtype=np.float32)
+        if not np.isfinite(values).all():
+            raise ValueError(f"Resampling produced non-finite HU values for {case_id}.")
+        nib.save(resampled, str(output_dir / source.name))
+        written += 1
+    return written
 
 
 def create_binary_masks_from_lobes(
@@ -160,6 +181,7 @@ def main() -> int:
     nifti_dir = output_root / "nifti"
     interim_dir = output_root / "interim"
     manifest_path = output_root / "dirlab_manifest.parquet"
+    isotropic_dir = output_root / "nifti_1mm"
     lobe_dir = output_root / "lobes"
     masks_dir = output_root / "masks"
     shards_dir = output_root / "patches"
@@ -204,24 +226,29 @@ def main() -> int:
             env,
         )
 
+    # Resample before patching: native DIR-Lab scans have 2.5 mm slice spacing and
+    # ~0.6-0.7 mm in-plane spacing, so voxel-cubic patches would not be physically cubic.
+    n_resampled = resample_inspiratory_scans(nifti_dir, isotropic_dir, case_ids)
+    print(f"Resampled {n_resampled} inspiratory scans to 1 mm isotropic spacing.")
+
     # Five-lobe segmentation is mandatory for this project's spatial analysis; no fake fallback.
     run_command(
         [
             sys.executable, "scripts/segment_lobes.py",
-            "--nifti-dir", str(nifti_dir),
+            "--nifti-dir", str(isotropic_dir),
             "--output-dir", str(lobe_dir),
             "--cases", *case_ids,
         ],
         repo_root,
         env,
     )
-    mask_count = create_binary_masks_from_lobes(nifti_dir, lobe_dir, masks_dir, case_ids)
+    mask_count = create_binary_masks_from_lobes(isotropic_dir, lobe_dir, masks_dir, case_ids)
     print(f"Created {mask_count} whole-lung masks from five-lobe labels.")
 
     run_command(
         [
             sys.executable, "scripts/make_patches.py",
-            "--nifti-dir", str(nifti_dir),
+            "--nifti-dir", str(isotropic_dir),
             "--masks-dir", str(masks_dir),
             "--lobe-masks-dir", str(lobe_dir),
             "--output-dir", str(shards_dir),
