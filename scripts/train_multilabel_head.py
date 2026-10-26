@@ -4,6 +4,7 @@ Embeddings must be extracted from CT image data (for example, pooled 3D encoder
 patch embeddings). CT-RATE's 18 labels are report-derived pseudo-labels, not
 radiologist-adjudicated voxel masks or independently confirmed diagnoses.
 """
+
 from __future__ import annotations
 
 import argparse
