@@ -64,12 +64,33 @@ If the later goal is to predict clinical COPD severity, that requires patient-le
 6. **CT burden profile:** create transparent per-finding and per-lobe burden summaries; do not present as clinical severity without external validation.
 7. **External validation:** when a cohort with suitable annotations and spirometry becomes available, evaluate on held-out patients and assess association with clinical measures.
 
-## Current code status (important)
+## Implemented baseline and current limits
 
-- `scripts/ct_only_assessment.py` computes quantitative emphysema/density features by whole lung and lobe.
-- `scripts/train_multilabel_head.py` trains a scan-level 18-label classifier from an already-produced embedding CSV and CT-RATE label CSV.
-- The multi-label head **does not** generate embeddings from raw CT scans and **does not** predict per-lobe finding locations.
-- A complete five-lobe multi-finding pipeline is therefore not implemented yet. This document is the target design; do not claim the desired end-to-end model exists until the raw-volume inference, spatial supervision, and tests are connected.
+- `scripts/ct_only_assessment.py` computes quantitative density/emphysema features by whole lung and lobe.
+- `scripts/train_multilabel_head.py` trains a scan-level 18-label classifier from precomputed scan embeddings and CT-RATE report-derived labels.
+- `scripts/train_five_lobe_mil.py` adds a **weakly supervised five-lobe multiple-instance learning (MIL) baseline**. It takes numeric image-derived features for each of the five lobes, predicts all 18 findings at lobe level, and combines the five probabilities with noisy-OR to train against scan-level labels. It writes scan-level metrics, a model checkpoint, and `holdout_lobe_hypotheses.csv`.
+- The lobe scores are **hypotheses**, not validated localization: only scan-level report labels supervise training. No lobe-annotated reference set is currently wired into evaluation.
+- The current model consumes precomputed lobe features; it does **not** read raw CT, segment lobes, extract learned 3D embeddings, or provide voxel-level lesion masks. Those remain integration milestones.
+- Clinical COPD severity is not predicted or validated by this baseline. It reports CT finding predictions only; spirometry/clinical outcomes are needed to validate a clinical severity endpoint.
+
+### Running the MIL baseline
+
+The input lobe feature CSV needs columns `VolumeName` (or `volume_name`, `scan_id`, `case_id`), `lobe_id` (exactly `LUL`, `LLL`, `RUL`, `RML`, `RLL`), optional `patient_id`, and one or more numeric features. Each matched scan must have exactly one row for each lobe. The labels CSV must contain the 18 CT-RATE label columns and one matching scan-ID column.
+
+```powershell
+python scripts/train_five_lobe_mil.py \
+  --lobe-features-csv outputs/real/reports/lobe_features.csv \
+  --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv \
+  --output-dir outputs/real/five_lobe_mil \
+  --epochs 100
+```
+
+Outputs:
+- `five_lobe_mil.pt`: model weights and feature normalization metadata.
+- `metrics.json`: patient-grouped holdout scan-level metrics and explicit validation caveats.
+- `holdout_lobe_hypotheses.csv`: one row per held-out scan/lobe with 18 weak localization scores.
+
+Medical-imaging MIL is a reasonable research strategy when only case-level labels exist, but global labels do not prove the model has found the actual abnormal lobe. Independent lobe-level annotation is required to quantify localization performance.
 
 ## Key literature
 
