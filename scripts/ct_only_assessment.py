@@ -27,6 +27,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+
 # Research-only inspiratory CT emphysema bands reported in published cohorts.
 # These are NOT GOLD grades and are not diagnostic cutoffs.
 def ct_emphysema_band(laa950_pct: float) -> str:
