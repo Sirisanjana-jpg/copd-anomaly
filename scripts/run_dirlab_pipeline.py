@@ -59,7 +59,9 @@ def discover_case_archives(data_dir: Path, cases: list[str] | None = None) -> di
     if requested is not None:
         missing = sorted(requested - set(found))
         if missing:
-            raise FileNotFoundError(f"No matching ZIP archive found under {data_dir} for {missing}.")
+            raise FileNotFoundError(
+                f"No matching ZIP archive found under {data_dir} for {missing}."
+            )
     if not found:
         raise FileNotFoundError(
             f"No DIR-Lab case ZIPs found under {data_dir}. Expected filenames containing "
@@ -78,9 +80,7 @@ def run_command(command: list[str], repo_root: Path, env: dict[str, str]) -> Non
     subprocess.run(command, cwd=repo_root, env=env, check=True)
 
 
-def resample_inspiratory_scans(
-    nifti_dir: Path, output_dir: Path, cases: list[str]
-) -> int:
+def resample_inspiratory_scans(nifti_dir: Path, output_dir: Path, cases: list[str]) -> int:
     """Resample inspiratory CTs to an isotropic 1 mm grid before cubic patch sampling."""
     output_dir.mkdir(parents=True, exist_ok=True)
     written = 0
@@ -139,7 +139,9 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--config", type=Path, default=Path("configs/data/dirlab_cases.yaml"))
     parser.add_argument("--output-root", type=Path, default=Path("data/processed/dirlab_run"))
-    parser.add_argument("--cases", nargs="*", default=None, help="Optional case IDs, e.g. copd1 copd2.")
+    parser.add_argument(
+        "--cases", nargs="*", default=None, help="Optional case IDs, e.g. copd1 copd2."
+    )
     parser.add_argument("--patch-size", type=int, default=50)
     parser.add_argument("--max-patches", type=int, default=100)
     parser.add_argument("--shard-size", type=int, default=500)
