@@ -32,7 +32,7 @@ If you require a GPU rather than allowing the training script to use CPU:
 python scripts/run_dirlab_pipeline.py --data-dir data --output-root data/processed/dirlab_run --epochs 5 --batch-size 2 --device cuda --require-cuda
 ```
 
-Use a new `--output-root` for a fresh extraction if `patch_manifest.parquet` already exists. The script does not delete or overwrite raw archives. It temporarily indexes archives for the existing converter, converts raw scans to NIfTI, generates five-lobe masks, derives whole-lung masks from those labels, extracts patches, trains the contrastive encoder, fits a GMM to patches with LAA-950 fraction `<= 0.01`, scores patches, and writes lobe-level anomaly features.
+Use a new `--output-root` for a fresh extraction if `patch_manifest.parquet` already exists. The script does not delete or overwrite raw archives. It temporarily indexes archives for the existing converter, converts raw scans to NIfTI, resamples inspiratory scans to a 1 mm isotropic grid (important because raw DIR-Lab slices are 2.5 mm thick), generates five-lobe masks, derives whole-lung masks from those labels, extracts patches, trains the contrastive encoder, fits a GMM to patches with LAA-950 fraction `<= 0.01`, scores patches, and writes lobe-level anomaly features.
 
 ## Expected outputs
 
