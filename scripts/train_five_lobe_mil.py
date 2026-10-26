@@ -40,7 +40,7 @@ class NoisyOrLobeMIL(nn.Module):
 
 
 def _normalize_scan_id(value: object) -> str:
-    value = str(value).replace("\\\\", "/").split("/")[-1]
+    value = str(value).replace(chr(92), "/").split("/")[-1]
     for suffix in (".nii.gz", ".nii"):
         if value.endswith(suffix):
             return value[: -len(suffix)]
