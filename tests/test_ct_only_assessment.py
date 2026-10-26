@@ -70,3 +70,11 @@ def test_report_proxy_model_is_explicitly_not_clinically_validated(tmp_path: Pat
     assert result["label_source"] == "report"
     assert result["clinical_validation_status"] == "NOT_CLINICALLY_VALIDATED"
     assert (tmp_path / "model" / "evaluation_metrics.json").is_file()
+
+
+def test_ct_emphysema_bands_are_not_gold_grades() -> None:
+    from scripts.ct_only_assessment import ct_emphysema_band
+
+    assert ct_emphysema_band(2.0) == "low_ct_emphysema_burden_lt6pct"
+    assert ct_emphysema_band(6.0) == "intermediate_ct_emphysema_burden_6_to_lt14pct"
+    assert ct_emphysema_band(14.0) == "high_ct_emphysema_burden_ge14pct"
