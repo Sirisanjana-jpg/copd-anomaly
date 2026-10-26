@@ -27,6 +27,16 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+# Research-only inspiratory CT emphysema bands reported in published cohorts.
+# These are NOT GOLD grades and are not diagnostic cutoffs.
+def ct_emphysema_band(laa950_pct: float) -> str:
+    if laa950_pct < 6.0:
+        return "low_ct_emphysema_burden_lt6pct"
+    if laa950_pct < 14.0:
+        return "intermediate_ct_emphysema_burden_6_to_lt14pct"
+    return "high_ct_emphysema_burden_ge14pct"
+
+
 LOBE_NAMES = {
     1: "right_upper",
     2: "right_middle",
@@ -113,16 +123,16 @@ def extract_features(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> pd.DataF
 
         spacing = tuple(float(v) for v in ct_img.header.get_zooms()[:3])
         row: dict[str, object] = {"case_id": case_id, "ct_path": str(ct_path)}
-        row.update(
-            {f"whole_lung_{k}": v for k, v in _summarize_region(ct[labels > 0], spacing).items()}
-        )
+        whole_features = _summarize_region(ct[labels > 0], spacing)
+        row.update({f"whole_lung_{k}": v for k, v in whole_features.items()})
+        row["whole_lung_ct_emphysema_band"] = ct_emphysema_band(whole_features["laa950_pct"])
         for lobe_id, lobe_name in LOBE_NAMES.items():
-            row.update(
-                {
-                    f"{lobe_name}_{k}": v
-                    for k, v in _summarize_region(ct[labels == lobe_id], spacing).items()
-                }
+            lobe_features = _summarize_region(ct[labels == lobe_id], spacing)
+            row.update({f"{lobe_name}_{k}": v for k, v in lobe_features.items()})
+            row[f"{lobe_name}_ct_emphysema_band"] = ct_emphysema_band(
+                lobe_features["laa950_pct"]
             )
+        row["severity_label_scope"] = "CT_EMPHYSEMA_BURDEN_ONLY_NOT_GOLD"
         records.append(row)
 
     frame = pd.DataFrame(records)
