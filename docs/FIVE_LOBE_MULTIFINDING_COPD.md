@@ -90,7 +90,8 @@ python scripts/train_five_lobe_mil.py `
 Outputs:
 - `five_lobe_mil.pt`: model weights and feature normalization metadata.
 - `metrics.json`: patient-grouped holdout scan-level metrics and explicit validation caveats.
-- `holdout_lobe_hypotheses.csv`: one row per held-out scan/lobe with 18 weak localization scores.
+- `holdout_lobe_hypotheses.csv`: one row per held-out scan/lobe with the raw input features and 18 weak localization scores.
+- `holdout_scan_burden_profile.csv`: a scan-level summary of volume-weighted density features and scan-level probabilities. This is a transparent CT structural profile, not a clinical severity score.
 
 Medical-imaging MIL is a reasonable research strategy when only case-level labels exist, but global labels do not prove the model has found the actual abnormal lobe. Independent lobe-level annotation is required to quantify localization performance.
 
