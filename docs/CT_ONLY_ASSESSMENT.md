@@ -13,7 +13,7 @@ LAA-950 is a widely used quantitative emphysema measure on inspiratory CT. Its i
 
 ## Run feature extraction
 
-Prepare calibrated inspiratory NIfTI CT volumes and matching five-lobe masks. For each CT file, the expected mask name is the CT filename stem plus `_lobes.nii.gz`. For example, `case001_insp.nii.gz` pairs with `case001_insp_lobes.nii.gz`.
+Prepare calibrated inspiratory NIfTI CT volumes and matching five-lobe masks. For each CT file, the expected mask name uses the case ID without the `_insp` suffix. For example, `case001_insp.nii.gz` pairs with `case001_lobes.nii.gz`.
 
 ```powershell
 python scripts/ct_only_assessment.py `
