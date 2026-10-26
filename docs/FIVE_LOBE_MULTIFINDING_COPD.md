@@ -79,10 +79,11 @@ If the later goal is to predict clinical COPD severity, that requires patient-le
 First generate the numeric lobe feature table from the actual CT volumes and their corresponding masks. The CT and mask filenames must match; masks must be named `<VolumeName>_lobes.nii.gz`. CT/mask geometry and lobe IDs 1–5 are validated. The resulting table has one row per lobe with `VolumeName`, `patient_id`, `lobe_id` (`RUL`, `RML`, `RLL`, `LUL`, `LLL`) and numeric HU/volume features. The labels CSV must contain the 18 CT-RATE label columns and a matching volume-name column.
 
 ```powershell
-python scripts/train_five_lobe_mil.py \
-  --lobe-features-csv outputs/real/reports/lobe_features.csv \
-  --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv \
-  --output-dir outputs/real/five_lobe_mil \
+python scripts/build_five_lobe_features.py --ct-dir data/ctrate_nifti --lobe-dir data/ctrate_lobes --output-csv outputs/real/reports/ct_lobe_feature_table.csv
+python scripts/train_five_lobe_mil.py `
+  --lobe-features-csv outputs/real/reports/ct_lobe_feature_table.csv `
+  --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv `
+  --output-dir outputs/real/five_lobe_mil `
   --epochs 100
 ```
 
