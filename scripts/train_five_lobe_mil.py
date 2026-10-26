@@ -39,6 +39,14 @@ class NoisyOrLobeMIL(nn.Module):
         return scan_probs.clamp(1e-6, 1 - 1e-6), lobe_probs
 
 
+def _normalize_scan_id(value: object) -> str:
+    value = str(value).replace("\\\\", "/").split("/")[-1]
+    for suffix in (".nii.gz", ".nii"):
+        if value.endswith(suffix):
+            return value[: -len(suffix)]
+    return value
+
+
 def _key(df: pd.DataFrame, what: str) -> str:
     for candidate in SCAN_KEYS:
         if candidate in df.columns:
@@ -69,6 +77,8 @@ def train_lobe_mil(
     features["lobe_id"] = features["lobe_id"].astype(str).str.upper()
     if not set(features["lobe_id"]).issubset(set(LOBE_ORDER)):
         raise ValueError(f"Unsupported lobe_id. Use exactly these IDs: {LOBE_ORDER}.")
+    features[feature_scan_key] = features[feature_scan_key].map(_normalize_scan_id)
+    labels[label_scan_key] = labels[label_scan_key].map(_normalize_scan_id)
     if features.duplicated([feature_scan_key, "lobe_id"]).any():
         raise ValueError("Duplicate scan/lobe rows found; expected exactly one row per lobe.")
     feature_cols = [
