@@ -14,8 +14,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.model_selection import GroupShuffleSplit
 from torch import nn
 
 from scripts.train_multilabel_head import CTRATE_LABELS
@@ -151,7 +151,6 @@ def train_lobe_mil(
         "feature_mean": mean.tolist(), "feature_std": std.tolist(),
     }, output_dir / "five_lobe_mil.pt")
     loc_rows = []
-    scan_keys = np.asarray(sorted(matched))
     # Keep output ordering aligned to the scan tensors, rather than the raw CSV.
     valid_ids = []
     for scan_id in sorted(matched):
