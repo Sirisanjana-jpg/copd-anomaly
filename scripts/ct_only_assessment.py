@@ -4,6 +4,7 @@ Computes quantitative CT features without requiring expiratory scans. Optional
 classification requires an explicitly declared label source; report-derived labels
 are weak proxies and must never be described as clinical COPD diagnosis.
 """
+
 from __future__ import annotations
 
 import argparse
