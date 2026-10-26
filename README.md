@@ -11,7 +11,7 @@ A modular, reproducible implementation and extension of the self-supervised anom
 ## 1. Scope & Research Objective
 
 - **Base Method Reproduction**: Self-supervised 3D contrastive learning ($50 \times 50 \times 50$ lung parenchyma patches) trained on disease-unlabeled CT scans $\to$ latent space density modeling on normal controls $\to$ patch anomaly score $s(x) = -\log p(f(x))$ $\to$ subject-level aggregation $S(X)$.
-- **Publication question**: Does five-lobe analysis of CT patch anomaly scores provide useful spatially resolved characterization beyond whole-lung summaries?
+- **Primary research question**: Can CT provide multi-label, five-lobe characterization of COPD-related structural findings and an interpretable patient-level CT burden profile beyond whole-lung summaries?
 - **Modality Scope**: Chest computed tomography (inspiratory $\pm$ registered expiratory) + clinical parameters.
 - **Strict Exclusions**: Chest X-ray, MRI, and any other imaging modality.
 
@@ -29,7 +29,7 @@ A modular, reproducible implementation and extension of the self-supervised anom
 
 In addition to emphysema-oriented quantitative CT analysis, the repository now includes an exploratory **18-label chest CT finding classification head** for CT-RATE. The supported report-derived labels are medical material, arterial wall calcification, cardiomegaly, pericardial effusion, coronary artery wall calcification, hiatal hernia, lymphadenopathy, emphysema, atelectasis, lung nodule, lung opacity, pulmonary fibrotic sequela, pleural effusion, mosaic attenuation pattern, peribronchial thickening, consolidation, bronchiectasis, and interlobular septal thickening.
 
-See [the multi-label workflow guide](docs/MULTILABEL_CT_FINDINGS.md) and `scripts/train_multilabel_head.py`. The head expects one image-derived embedding vector per CT volume and the matching official CT-RATE label CSV. It does not extract embeddings from raw CT volumes on its own; the image encoder and embedding aggregation pipeline must be run first.
+See the [five-lobe multi-finding research plan](docs/FIVE_LOBE_MULTIFINDING_COPD.md), [multi-label workflow guide](docs/MULTILABEL_CT_FINDINGS.md), and `scripts/train_multilabel_head.py`. The head expects one image-derived embedding vector per CT volume and the matching official CT-RATE label CSV. It does not extract embeddings from raw CT volumes on its own; the image encoder and embedding aggregation pipeline must be run first.
 
 **Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics therefore measure agreement with those labels, not confirmed disease diagnosis. The model is scan-level and does not localize lesions. Do not describe it as clinically validated.
 
