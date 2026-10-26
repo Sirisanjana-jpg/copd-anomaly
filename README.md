@@ -40,7 +40,7 @@ python scripts/train_five_lobe_mil.py --lobe-features-csv outputs/real/reports/c
 
 Each scan needs exactly five rows (`RUL`, `RML`, `RLL`, `LUL`, `LLL`) and a matching CT-RATE volume name. The extractor validates CT/mask geometry and all five lobe IDs. The MIL model needs at least 30 complete matched scans and 10 patient groups. Its per-lobe outputs are weak localization hypotheses—not radiologist-validated locations.
 
-**Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics therefore measure agreement with those labels, not confirmed disease diagnosis. The model is scan-level and does not localize lesions. Do not describe it as clinically validated.
+**Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics measure agreement with those labels, not confirmed diagnosis. The scan-level head does not localize lesions; the MIL extension emits weak per-lobe hypotheses that are not radiologist-validated. Neither model is clinically validated.
 
 ## 2. Repository Layout
 
