@@ -98,7 +98,8 @@ def train_multilabel_head(
         None,
     )
     feature_cols = [
-        name for name in embeddings.columns
+        name
+        for name in embeddings.columns
         if name not in {emb_key, "patient_id", "PatientID", "patient", "split"}
         and pd.api.types.is_numeric_dtype(embeddings[name])
     ]
@@ -126,7 +127,9 @@ def train_multilabel_head(
         raise ValueError("At least 10 independent patient groups are required for a holdout.")
     y_frame = joined[CTRATE_LABELS].apply(pd.to_numeric, errors="coerce")
     if y_frame.isna().any().any():
-        raise ValueError("Finding labels contain missing/non-numeric values; resolve label encoding first.")
+        raise ValueError(
+            "Finding labels contain missing/non-numeric values; resolve label encoding first."
+        )
     if not set(np.unique(y_frame.to_numpy())).issubset({0, 1}):
         raise ValueError("This baseline expects binary 0/1 CT-RATE pseudo-labels only.")
     if (y_frame.sum(axis=0) == 0).any():
@@ -160,7 +163,11 @@ def train_multilabel_head(
         score = probabilities[:, idx]
         auc = float(roc_auc_score(truth, score)) if np.unique(truth).size == 2 else None
         ap = float(average_precision_score(truth, score)) if truth.sum() > 0 else None
-        per_label[name] = {"roc_auc": auc, "average_precision": ap, "test_positive_count": int(truth.sum())}
+        per_label[name] = {
+            "roc_auc": auc,
+            "average_precision": ap,
+            "test_positive_count": int(truth.sum()),
+        }
         if auc is not None:
             aucs.append(auc)
         if ap is not None:
@@ -204,17 +211,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fit an exploratory 18-label CT-RATE classifier on image-derived scan embeddings."
     )
-    parser.add_argument("--embeddings-csv", type=Path, required=True,
-                        help="One row per CT volume, with scan ID and numeric image embedding columns.")
-    parser.add_argument("--labels-csv", type=Path, required=True,
-                        help="CT-RATE official train/validation multi-abnormality labels CSV.")
+    parser.add_argument(
+        "--embeddings-csv",
+        type=Path,
+        required=True,
+        help="One row per CT volume, with scan ID and numeric image embedding columns.",
+    )
+    parser.add_argument(
+        "--labels-csv",
+        type=Path,
+        required=True,
+        help="CT-RATE official train/validation multi-abnormality labels CSV.",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/real/ct_rate_multilabel"))
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    print(json.dumps(train_multilabel_head(
-        args.embeddings_csv, args.labels_csv, args.output_dir, args.test_size, args.seed
-    ), indent=2))
+    print(
+        json.dumps(
+            train_multilabel_head(
+                args.embeddings_csv, args.labels_csv, args.output_dir, args.test_size, args.seed
+            ),
+            indent=2,
+        )
+    )
     return 0
 
 
