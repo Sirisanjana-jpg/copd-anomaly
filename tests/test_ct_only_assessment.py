@@ -20,7 +20,7 @@ def _write_case(root: Path, case_id: str) -> None:
         ct[(label - 1) * 4 : label * 4, :, :] = -960 if label % 2 else -800
     affine = np.diag([1.0, 1.0, 1.0, 1.0])
     nib.save(nib.Nifti1Image(ct, affine), ct_dir / f"{case_id}_insp.nii.gz")
-    nib.save(nib.Nifti1Image(mask, affine), mask_dir / f"{case_id}_insp_lobes.nii.gz")
+    nib.save(nib.Nifti1Image(mask, affine), mask_dir / f"{case_id}_lobes.nii.gz")
 
 
 def test_extract_features_reports_whole_lung_and_five_lobes(tmp_path: Path) -> None:
