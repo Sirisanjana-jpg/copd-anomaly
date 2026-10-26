@@ -87,7 +87,13 @@ def build_lobe_feature_table(ct_dir: Path, lobe_dir: Path, output_csv: Path) -> 
         if present != set(LOBE_LABELS):
             raise ValueError(f"Scan {scan_id} must contain lobe labels 1-5; found {sorted(present)}.")
         spacing = tuple(float(v) for v in ct_img.header.get_zooms()[:3])
-        patient_id = ct_path.parent.parent.name if ct_path.parent != ct_dir else scan_id
+        relative_parts = ct_path.relative_to(ct_dir).parts
+        if len(relative_parts) >= 3:
+            patient_id = relative_parts[-3]
+        elif len(relative_parts) == 2:
+            patient_id = relative_parts[0]
+        else:
+            patient_id = scan_id
         for label_id, lobe_name in LOBE_LABELS.items():
             row: dict[str, object] = {
                 "VolumeName": scan_id,
