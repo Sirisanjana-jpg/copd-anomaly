@@ -5,6 +5,7 @@ CT-RATE report labels supervise scan-level predictions; they do not verify lobe-
 localization. Do not use the 10-case DIR-Lab COPDgene set as a multi-label training
 cohort because it does not provide the required 18 finding labels.
 """
+
 from __future__ import annotations
 
 import argparse
