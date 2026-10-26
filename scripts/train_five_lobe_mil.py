@@ -20,7 +20,7 @@ from torch import nn
 
 from scripts.train_multilabel_head import CTRATE_LABELS
 
-LOBE_ORDER = ("LUL", "LLL", "RUL", "RML", "RLL")
+LOBE_ORDER = ("RUL", "RML", "RLL", "LUL", "LLL")
 SCAN_KEYS = ("VolumeName", "volume_name", "scan_id", "case_id")
 
 
