@@ -15,7 +15,7 @@ def test_builds_five_lobe_feature_rows_from_nifti(tmp_path: Path) -> None:
     ct = np.full((10, 10, 10), -900, dtype=np.float32)
     mask = np.zeros((10, 10, 10), dtype=np.uint8)
     for label in LOBE_LABELS:
-        mask[label - 1:label + 1, :, :] = label
+        mask[label - 1 : label + 1, :, :] = label
     affine = np.diag([1.0, 1.0, 1.0, 1.0])
     ct_path = ct_dir / f"{scan_id}.nii.gz"
     mask_path = mask_dir / f"{scan_id}_lobes.nii.gz"
