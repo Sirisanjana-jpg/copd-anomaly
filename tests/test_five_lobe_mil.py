@@ -29,6 +29,9 @@ def test_five_lobe_mil_writes_scan_metrics_and_lobe_hypotheses(tmp_path: Path) -
     assert report["localization_status"].startswith("WEAK_LOCALIZATION")
     assert len(report["per_label_metrics"]) == 18
     assert (tmp_path / "out" / "five_lobe_mil.pt").is_file()
+    assert (tmp_path / "out" / "holdout_scan_burden_profile.csv").is_file()
+    profile = pd.read_csv(tmp_path / "out" / "holdout_scan_burden_profile.csv")
+    assert profile["ct_burden_status"].eq("STRUCTURAL_PROFILE_NOT_CLINICAL_SEVERITY").all()
     out = pd.read_csv(tmp_path / "out" / "holdout_lobe_hypotheses.csv")
     assert set(out.lobe_id) == set(LOBE_ORDER)
     assert len(out) == report["n_test_scans"] * 5
