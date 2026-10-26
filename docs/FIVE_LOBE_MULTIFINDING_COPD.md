@@ -68,6 +68,7 @@ If the later goal is to predict clinical COPD severity, that requires patient-le
 
 - `scripts/ct_only_assessment.py` computes quantitative density/emphysema features by whole lung and lobe.
 - `scripts/train_multilabel_head.py` trains a scan-level 18-label classifier from precomputed scan embeddings and CT-RATE report-derived labels.
+- `scripts/build_five_lobe_features.py` extracts quantitative CT features per lobe from a NIfTI CT and a matching five-lobe mask, yielding the long-format input table for spatial modelling.
 - `scripts/train_five_lobe_mil.py` adds a **weakly supervised five-lobe multiple-instance learning (MIL) baseline**. It takes numeric image-derived features for each of the five lobes, predicts all 18 findings at lobe level, and combines the five probabilities with noisy-OR to train against scan-level labels. It writes scan-level metrics, a model checkpoint, and `holdout_lobe_hypotheses.csv`.
 - The lobe scores are **hypotheses**, not validated localization: only scan-level report labels supervise training. No lobe-annotated reference set is currently wired into evaluation.
 - The current model consumes precomputed lobe features; it does **not** read raw CT, segment lobes, extract learned 3D embeddings, or provide voxel-level lesion masks. Those remain integration milestones.
@@ -75,7 +76,7 @@ If the later goal is to predict clinical COPD severity, that requires patient-le
 
 ### Running the MIL baseline
 
-The input lobe feature CSV needs columns `VolumeName` (or `volume_name`, `scan_id`, `case_id`), `lobe_id` (exactly `LUL`, `LLL`, `RUL`, `RML`, `RLL`), optional `patient_id`, and one or more numeric features. Each matched scan must have exactly one row for each lobe. The labels CSV must contain the 18 CT-RATE label columns and one matching scan-ID column.
+First generate the numeric lobe feature table from the actual CT volumes and their corresponding masks. The CT and mask filenames must match; masks must be named `<VolumeName>_lobes.nii.gz`. CT/mask geometry and lobe IDs 1–5 are validated. The resulting table has one row per lobe with `VolumeName`, `patient_id`, `lobe_id` (`RUL`, `RML`, `RLL`, `LUL`, `LLL`) and numeric HU/volume features. The labels CSV must contain the 18 CT-RATE label columns and a matching volume-name column.
 
 ```powershell
 python scripts/train_five_lobe_mil.py \
@@ -97,3 +98,8 @@ Medical-imaging MIL is a reasonable research strategy when only case-level label
 - Fleischner Society statement on CT-definable COPD subtypes: https://pmc.ncbi.nlm.nih.gov/articles/PMC4613878/
 - Asian Society of Thoracic Radiology quantitative CT recommendations: https://pmc.ncbi.nlm.nih.gov/articles/PMC13389076/
 - Review of quantitative CT and pulmonary function: https://publications.ersnet.org/content/errev/30/161/210031
+
+
+## Dataset decision: DIR-Lab COPDgene
+
+DIR-Lab COPDgene's 10 paired inspiratory/expiratory cases are **not part of the primary multi-label training cohort**. They do not supply the 18 CT-RATE finding labels, and ten patients are far too few to train or validate a multi-finding model. Their strongest value is as a small, optional technical benchmark for inhale/exhale registration using expert landmarks and, if the paired scans and registration are sound, exploratory air-trapping/PRM feature development. We therefore keep the code/data path only as an optional registration/PRM validation asset; do not spend the primary modelling budget on it or mix its cases into CT-RATE training/evaluation. See [DIR-Lab's dataset description](https://med.emory.edu/departments/radiation-oncology/research-laboratories/deformable-image-registration/downloads-and-reference-data/copdgene.html) and the registration/air-trapping study ([Radiology: Artificial Intelligence](https://pmc.ncbi.nlm.nih.gov/articles/PMC8823452/)).
