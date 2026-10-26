@@ -67,3 +67,12 @@ Update this file only when a result is reproducibly verified; include command, d
 - Added `docs/CLOUD_RUNTIME.md` describing path-based Colab/Kaggle execution and `docs/KAGGLE_REAL_DATA_SMOKE.md` for Kaggle smoke validation.
 - Publication scope is narrowed to imaging-based anomaly quantification and five-lobe analysis; see `docs/PUBLICATION_SCOPE.md`. Exacerbation prediction, clinical outcome modeling, and multimodal fusion are out of scope for this paper.
 - A CT-RATE report-label proxy analysis is optional and secondary only; it requires a reviewed, reproducible label-extraction table and a held-out real-data run, and cannot be described as clinical diagnosis.
+
+
+## Five-lobe multi-finding milestone (2026-10-26)
+
+- Added `scripts/build_five_lobe_features.py`: extracts per-lobe HU distribution, low-attenuation percentages, and volume from CT NIfTI plus matching five-lobe masks; emits a long-format feature table for modelling.
+- Added `scripts/train_five_lobe_mil.py`: trains an exploratory 18-label noisy-OR MIL model from per-lobe features and scan-level CT-RATE labels; emits patient-grouped holdout metrics and per-lobe weak-localization hypotheses.
+- Added synthetic tests for the feature extractor and MIL training. CI was observed queued/in progress after the implementation commits; do not mark it passing until all jobs finish.
+- Important limit: no raw-volume end-to-end encoder is connected to this MIL head, and no radiologist-annotated lobe-level findings are available in the current workflow. The lobe scores are hypotheses, not verified localization or clinical severity.
+- Dataset decision: DIR-Lab COPDgene's 10 paired scans are not the primary training data because they lack CT-RATE's 18 finding labels. Keep them only as optional registration/TRE and exploratory paired-inspiratory/expiratory PRM validation; do not mix them into CT-RATE training or evaluation.
