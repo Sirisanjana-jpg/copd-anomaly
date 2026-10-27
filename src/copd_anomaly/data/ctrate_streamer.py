@@ -176,6 +176,22 @@ class CTRATEStreamer:
         self.segmenter = LungSegmenter(
             backend="totalsegmentator" if use_lobe_segmentation else "threshold"
         )
+        def ctrate_remote_path(volume_name: str) -> str:
+    """Build the nested CT-RATE Hub path from a canonical volume filename."""
+    name = Path(volume_name).name
+
+    match = re.fullmatch(
+        r"(train|valid)_(\d+)_([a-z]+)_(\d+)\.nii\.gz",
+        name,
+    )
+    if not match:
+        raise ValueError(f"Unexpected CT-RATE filename: {name!r}")
+
+    split, subject_num, series, reconstruction = match.groups()
+    subject = f"{split}_{subject_num}"
+    series_dir = f"{subject}_{series}"
+
+    return f"dataset/{split}/{subject}/{series_dir}/{name}"
 
     def stream_and_process_scan(
         self,
