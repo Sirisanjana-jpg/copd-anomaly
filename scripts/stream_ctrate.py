@@ -248,7 +248,16 @@ def stream_ctrate(
                 logger.info("Skipping completed volume %s (resume).", volume_name)
                 continue
             try:
-                count = streamer.stream_and_process_scan(volume_name, patient_id, writer)
+               slope = float(row["RescaleSlope"])
+               intercept = float(row["RescaleIntercept"])
+
+            count = streamer.stream_and_process_scan(
+              volume_name=volume_name,
+              patient_id=patient_id,
+              writer=writer,
+              slope=slope,
+              intercept=intercept,
+            )
                 if count > 0:
                     writer.close()  # Persist the current shard and full manifest after every scan.
                     completed_scans.add(scan_id)
