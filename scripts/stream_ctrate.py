@@ -240,30 +240,34 @@ def stream_ctrate(
                 raise ValueError("max_volumes_per_split must be positive when supplied.")
             volumes = volumes[:max_volumes_per_split]
 
-        for row in volumes:
+                for row in volumes:
             volume_name = str(row["VolumeName"])
             scan_id = Path(volume_name).name.replace(".nii.gz", "")
             patient_id = str(row["patient_id"])
+
             if scan_id in completed_scans or scan_id in completed_without_patches:
                 logger.info("Skipping completed volume %s (resume).", volume_name)
                 continue
-            try:
-               slope = float(row["RescaleSlope"])
-               intercept = float(row["RescaleIntercept"])
 
-            count = streamer.stream_and_process_scan(
-              volume_name=volume_name,
-              patient_id=patient_id,
-              writer=writer,
-              slope=slope,
-              intercept=intercept,
-            )
+            try:
+                slope = float(row["RescaleSlope"])
+                intercept = float(row["RescaleIntercept"])
+
+                count = streamer.stream_and_process_scan(
+                    volume_name=volume_name,
+                    patient_id=patient_id,
+                    writer=writer,
+                    slope=slope,
+                    intercept=intercept,
+                )
+
                 if count > 0:
-                    writer.close()  # Persist the current shard and full manifest after every scan.
+                    writer.close()
                     completed_scans.add(scan_id)
                     status = "success"
                 else:
                     status = "no_patches"
+
                 _append_log(
                     log_path,
                     {
@@ -273,22 +277,6 @@ def stream_ctrate(
                         "status": status,
                         "patch_count": count,
                         "error": "",
-                    },
-                )
-                logger.info("%s: status=%s patches=%d", volume_name, status, count)
-            except Exception as exc:
-                _append_log(
-                    log_path,
-                    {
-                        "scan_id": scan_id,
-                        "patient_id": patient_id,
-                        "volume_name": volume_name,
-                        "status": "failed",
-                        "patch_count": 0,
-                        "error": (
-                            f"exception={type(exc).__name__}; message={exc}\n"
-                            f"{traceback.format_exc()}"
-                        ),
                     },
                 )
                 logger.exception(
