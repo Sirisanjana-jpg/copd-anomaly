@@ -48,6 +48,78 @@ def ctrate_remote_path(volume_name: str) -> str:
 
     return f"dataset/{split}/{subject}/{series_dir}/{name}"
 
+def load_ctrate_hu(
+    image_path: str | Path,
+    slope: float,
+    intercept: float,
+) -> tuple[nib.Nifti1Image, np.ndarray, np.ndarray]:
+    """Load CT-RATE stored values and apply CSV rescale metadata once.
+
+    Returns:
+        image: Canonical NIfTI image, retaining its spatial geometry.
+        hu_xyz: HU volume in canonical XYZ orientation.
+        valid_xyz: Boolean mask identifying non-padding source voxels.
+    """
+    if not np.isfinite(slope) or slope == 0:
+        raise ValueError(f"Invalid CT-RATE rescale slope: {slope!r}")
+    if not np.isfinite(intercept):
+        raise ValueError(f"Invalid CT-RATE rescale intercept: {intercept!r}")
+
+    source_img = nib.load(str(image_path))
+    raw = np.asarray(source_img.dataobj.get_unscaled(), dtype=np.float32)
+
+    if not np.isfinite(raw).all():
+        raise ValueError(f"Non-finite stored voxel values in {image_path}")
+
+    # CT-RATE raw-zero voxels are treated as padding for this dataset.
+    # Keep the mask separately; do not infer validity from HU values.
+    valid_source = raw != 0
+
+    hu = raw * np.float32(slope) + np.float32(intercept)
+    hu[~valid_source] = -1024.0
+
+    # Apply orientation to the HU data and its validity mask together.
+    hu_img = nib.Nifti1Image(hu, source_img.affine, source_img.header)
+    hu_img.set_sform(source_img.get_sform(), code=int(source_img.header["sform_code"]))
+    hu_img.set_qform(source_img.get_qform(), code=int(source_img.header["qform_code"]))
+
+    canonical_img = nib.as_closest_canonical(hu_img)
+    canonical_hu = canonical_img.get_fdata(dtype=np.float32)
+
+    valid_img = nib.Nifti1Image(
+        valid_source.astype(np.uint8),
+        source_img.affine,
+        source_img.header,
+    )
+    valid_img.set_sform(
+        source_img.get_sform(),
+        code=int(source_img.header["sform_code"]),
+    )
+    valid_img.set_qform(
+        source_img.get_qform(),
+        code=int(source_img.header["qform_code"]),
+    )
+    canonical_valid_img = nib.as_closest_canonical(valid_img)
+    valid_xyz = canonical_valid_img.get_fdata(dtype=np.float32) > 0.5
+
+    # Resample both onto the same 1 mm output grid.
+    canonical_img = resample_to_output(
+        canonical_img, voxel_sizes=(1.0, 1.0, 1.0), order=1
+    )
+    valid_resampled = resample_to_output(
+        canonical_valid_img, voxel_sizes=(1.0, 1.0, 1.0), order=0
+    )
+
+    hu_xyz = canonical_img.get_fdata(dtype=np.float32)
+    valid_xyz = valid_resampled.get_fdata(dtype=np.float32) > 0.5
+
+    # Prevent interpolated values outside the source image from being treated
+    # as real CT voxels.
+    hu_xyz[~valid_xyz] = -1024.0
+
+    return canonical_img, hu_xyz, valid_xyz
+
+
 def extract_patient_id(volume_or_path: str) -> str:
     """
     Extracts canonical subject/patient ID from CT-RATE filename or path.
@@ -193,10 +265,12 @@ class CTRATEStreamer:
         )
         
     def stream_and_process_scan(
-        self,
-        volume_name: str,
-        patient_id: str,
-        writer: ShardedPatchWriter,
+         self,
+    volume_name: str,
+    patient_id: str,
+    writer: ShardedPatchWriter,
+    slope: float,
+    intercept: float,
     ) -> int:
         """Streams a single scan and extracts patches while enforcing cleanup."""
         token = os.environ.get("HF_TOKEN") or os.environ.get("HF_READ")
@@ -234,29 +308,35 @@ class CTRATEStreamer:
             downloaded_path = Path(local_file)
             stage = "load_and_resample"
 
-            # Normalize orientation before resampling to an isotropic 1 mm grid.
-            # Interpolation is linear for intensities; segmentation is derived after resampling.
-            img = nib.as_closest_canonical(nib.load(str(downloaded_path)))
-            img = resample_to_output(img, voxel_sizes=(1.0, 1.0, 1.0), order=1)
-            vol_xyz = img.get_fdata(dtype=np.float32)
-            if not np.isfinite(vol_xyz).all():
-                raise ValueError(f"Non-finite CT intensities found in {volume_name}.")
-            intensity_min = float(np.min(vol_xyz))
-            intensity_max = float(np.max(vol_xyz))
-            if intensity_min >= -200.0 or intensity_min < -5000.0 or intensity_max > 10000.0:
-                raise ValueError(
-                    f"Intensity range [{intensity_min:.1f}, {intensity_max:.1f}] for {volume_name} "
-                    "does not look like HU-scaled CT. Verify NIfTI rescale slope/intercept."
-                )
-            logger.info(
-                "%s: isotropic 1 mm grid shape=%s, intensity range=[%.1f, %.1f] HU",
-                volume_name,
-                vol_xyz.shape,
-                intensity_min,
-                intensity_max,
-            )
-            vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
-            spacing_zyx = (1.0, 1.0, 1.0)
+img, vol_xyz, valid_xyz = load_ctrate_hu(
+    downloaded_path,
+    slope=slope,
+    intercept=intercept,
+)
+
+if not np.isfinite(vol_xyz).all():
+    raise ValueError(f"Non-finite HU values found in {volume_name}.")
+
+intensity_min = float(np.min(vol_xyz[valid_xyz]))
+intensity_max = float(np.max(vol_xyz[valid_xyz]))
+
+if intensity_min < -2000 or intensity_max > 5000:
+    raise ValueError(
+        f"Implausible HU range [{intensity_min:.1f}, {intensity_max:.1f}] "
+        f"for {volume_name}."
+    )
+
+logger.info(
+    "%s: HU range=[%.1f, %.1f], shape=%s",
+    volume_name,
+    intensity_min,
+    intensity_max,
+    vol_xyz.shape,
+)
+
+vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
+valid_zyx = np.transpose(valid_xyz, (2, 1, 0))
+spacing_zyx = (1.0, 1.0, 1.0)
 
             stage = "segmentation"
             mask = (
