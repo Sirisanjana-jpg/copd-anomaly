@@ -59,6 +59,8 @@ class UniformLungPatchSampler(PatchSampler):
         volume_exp: np.ndarray | None,
         lung_mask: np.ndarray,
         lobe_mask: np.ndarray | None = None,
+        valid_mask: np.ndarray | None = None,
+        patch_size: int | None = None,
         patch_size: int | None = None,
         overlap: float = 0.2,
         min_lung_fraction: float | None = None,
