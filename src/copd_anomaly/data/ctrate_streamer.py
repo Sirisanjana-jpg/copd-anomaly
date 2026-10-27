@@ -31,7 +31,22 @@ TIERS = {
     "medium": {"train": 300, "val": 90, "test": 210},
     "full": {"train": 1000, "val": 300, "test": 700},
 }
+def ctrate_remote_path(volume_name: str) -> str:
+    """Build the nested CT-RATE Hub path from a volume filename."""
+    name = Path(volume_name).name
 
+    match = re.fullmatch(
+        r"(train|valid)_(\d+)_([a-z]+)_(\d+)\.nii\.gz",
+        name,
+    )
+    if not match:
+        raise ValueError(f"Unexpected CT-RATE filename: {name!r}")
+
+    split, subject_num, series, _reconstruction = match.groups()
+    subject = f"{split}_{subject_num}"
+    series_dir = f"{subject}_{series}"
+
+    return f"dataset/{split}/{subject}/{series_dir}/{name}"
 
 def extract_patient_id(volume_or_path: str) -> str:
     """
@@ -176,23 +191,7 @@ class CTRATEStreamer:
         self.segmenter = LungSegmenter(
             backend="totalsegmentator" if use_lobe_segmentation else "threshold"
         )
-        def ctrate_remote_path(volume_name: str) -> str:
-    """Build the nested CT-RATE Hub path from a canonical volume filename."""
-    name = Path(volume_name).name
-
-    match = re.fullmatch(
-        r"(train|valid)_(\d+)_([a-z]+)_(\d+)\.nii\.gz",
-        name,
-    )
-    if not match:
-        raise ValueError(f"Unexpected CT-RATE filename: {name!r}")
-
-    split, subject_num, series, reconstruction = match.groups()
-    subject = f"{split}_{subject_num}"
-    series_dir = f"{subject}_{series}"
-
-    return f"dataset/{split}/{subject}/{series_dir}/{name}"
-
+        
     def stream_and_process_scan(
         self,
         volume_name: str,
@@ -223,7 +222,7 @@ class CTRATEStreamer:
                 )
             stage = "download"
             logger.info("Downloading %s from %s...", volume_name, self.repo_id)
-            remote_path = f"dataset/{subfolder}/{basename}"
+            remote_path = ctrate_remote_path(basename)
 
             local_file = hf_hub_download(
                 repo_id=self.repo_id,
