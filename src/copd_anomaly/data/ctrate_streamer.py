@@ -265,12 +265,12 @@ class CTRATEStreamer:
         )
         
     def stream_and_process_scan(
-         self,
-    volume_name: str,
-    patient_id: str,
-    writer: ShardedPatchWriter,
-    slope: float,
-    intercept: float,
+        self,
+        volume_name: str,
+        patient_id: str,
+        writer: ShardedPatchWriter,
+        slope: float,
+        intercept: float,
     ) -> int:
         """Streams a single scan and extracts patches while enforcing cleanup."""
         token = os.environ.get("HF_TOKEN") or os.environ.get("HF_READ")
@@ -306,38 +306,44 @@ class CTRATEStreamer:
                 local_dir=self.temp_dir,
             )
             downloaded_path = Path(local_file)
-            stage = "load_and_resample"
+                       stage = "load_and_resample"
 
-img, vol_xyz, valid_xyz = load_ctrate_hu(
-    downloaded_path,
-    slope=slope,
-    intercept=intercept,
-)
+            img, vol_xyz, valid_xyz = load_ctrate_hu(
+                downloaded_path,
+                slope=slope,
+                intercept=intercept,
+            )
 
-if not np.isfinite(vol_xyz).all():
-    raise ValueError(f"Non-finite HU values found in {volume_name}.")
+            if not np.isfinite(vol_xyz).all():
+                raise ValueError(
+                    f"Non-finite HU values found in {volume_name}."
+                )
 
-intensity_min = float(np.min(vol_xyz[valid_xyz]))
-intensity_max = float(np.max(vol_xyz[valid_xyz]))
+            if not np.any(valid_xyz):
+                raise ValueError(
+                    f"No valid voxels found in {volume_name}."
+                )
 
-if intensity_min < -2000 or intensity_max > 5000:
-    raise ValueError(
-        f"Implausible HU range [{intensity_min:.1f}, {intensity_max:.1f}] "
-        f"for {volume_name}."
-    )
+            intensity_min = float(np.min(vol_xyz[valid_xyz]))
+            intensity_max = float(np.max(vol_xyz[valid_xyz]))
 
-logger.info(
-    "%s: HU range=[%.1f, %.1f], shape=%s",
-    volume_name,
-    intensity_min,
-    intensity_max,
-    vol_xyz.shape,
-)
+            if intensity_min < -2000 or intensity_max > 5000:
+                raise ValueError(
+                    f"Implausible HU range [{intensity_min:.1f}, "
+                    f"{intensity_max:.1f}] for {volume_name}."
+                )
 
-vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
-valid_zyx = np.transpose(valid_xyz, (2, 1, 0))
-spacing_zyx = (1.0, 1.0, 1.0)
+            logger.info(
+                "%s: HU range=[%.1f, %.1f], shape=%s",
+                volume_name,
+                intensity_min,
+                intensity_max,
+                vol_xyz.shape,
+            )
 
+            vol_zyx = np.transpose(vol_xyz, (2, 1, 0))
+            valid_zyx = np.transpose(valid_xyz, (2, 1, 0))
+            spacing_zyx = (1.0, 1.0, 1.0)
             stage = "segmentation"
             mask = (
                 self.segmenter.segment_lobes(vol_zyx, spacing_zyx)
