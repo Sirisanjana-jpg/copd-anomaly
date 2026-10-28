@@ -7,7 +7,7 @@ name = "copd-anomaly"
 version = "0.1.0"
 description = "Reproduction and lobe-wise exacerbation extension of cOOpD anomaly-based CT quantification for COPD (Almeida et al., 2024)"
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10,<3.13"
 license = { text = "TODO: To be determined pending CT-RATE (CC-BY-NC-SA) and DIR-Lab data redistribution review" }
 authors = [
     { name = "COPD Anomaly Research Team" }
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "numpy>=1.24.0,<3.0.0",
@@ -44,14 +45,15 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
+    "pytest-env>=1.1.0",
     "ruff>=0.6.0",
     "pre-commit>=3.7.0",
     "mypy>=1.8.0",
 ]
 segmentation = [
-    # Optional backends checked dynamically at runtime with licence verification
+    # Optional backends; use explicit backend selection and inspect each generated mask.
     "lungmask>=0.2.16",
-    # "TotalSegmentator>=2.0.0", # Note: Non-commercial/academic license check required
+    "TotalSegmentator>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -82,6 +84,7 @@ known-first-party = ["copd_anomaly"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 addopts = "-v --strict-markers"
 env = [
     "OPENBLAS_NUM_THREADS=1",

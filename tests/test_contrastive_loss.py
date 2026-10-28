@@ -4,10 +4,9 @@ Unit tests for 3D ResNet Contrastive Encoder, NT-Xent loss, and augmentations.
 
 from __future__ import annotations
 
-import pytest
 import torch
 
-from copd_anomaly.models.augmentations import ContrastiveDualViewTransform, Random3DFlip
+from copd_anomaly.models.augmentations import ContrastiveDualViewTransform
 from copd_anomaly.models.encoder import ResNet3DEncoder
 from copd_anomaly.models.losses import NTXentLoss
 

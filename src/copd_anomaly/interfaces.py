@@ -235,4 +235,3 @@ class Evaluator(Protocol):
     ) -> dict[str, Any]:
         """Computes AUROC, AUPRC with bootstrap 95% confidence intervals."""
         ...
-

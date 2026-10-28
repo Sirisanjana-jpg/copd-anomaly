@@ -1,7 +1,7 @@
-# COPD-Anomaly: Deep Anomaly-Based Assessment of Chest CT & Lobe-Wise Exacerbation Risk
+# COPD-Anomaly: CT Anomaly Quantification and Five-Lobe Analysis
 
-[![CI](https://github.com/placeholder/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/placeholder/copd-anomaly/actions/workflows/ci.yml)
-[![Python 3.10 | 3.11](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml/badge.svg)](https://github.com/Sirisanjana-jpg/copd-anomaly/actions/workflows/ci.yml)
+[![Python 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![License: TODO](https://img.shields.io/badge/license-TODO-yellow.svg)](#license--terms)
 
 A modular, reproducible implementation and extension of the self-supervised anomaly quantification method described by **Almeida et al. (2024)** (*"Prediction of disease severity in COPD: a deep learning approach for anomaly-based quantitative assessment of chest CT"*, *European Radiology*, method name **cOOpD**).
@@ -11,7 +11,7 @@ A modular, reproducible implementation and extension of the self-supervised anom
 ## 1. Scope & Research Objective
 
 - **Base Method Reproduction**: Self-supervised 3D contrastive learning ($50 \times 50 \times 50$ lung parenchyma patches) trained on disease-unlabeled CT scans $\to$ latent space density modeling on normal controls $\to$ patch anomaly score $s(x) = -\log p(f(x))$ $\to$ subject-level aggregation $S(X)$.
-- **Extension Research Question**: Do **lobe-wise anomaly features** derived from CT add incremental predictive value for **12-month exacerbation risk** beyond clinical variables and a global anomaly score?
+- **Primary research question**: Can CT provide multi-label, five-lobe characterization of COPD-related structural findings and an interpretable patient-level CT burden profile beyond whole-lung summaries?
 - **Modality Scope**: Chest computed tomography (inspiratory $\pm$ registered expiratory) + clinical parameters.
 - **Strict Exclusions**: Chest X-ray, MRI, and any other imaging modality.
 
@@ -19,9 +19,28 @@ A modular, reproducible implementation and extension of the self-supervised anom
 > **Data Scope & Honest Reporting Boundaries**:
 > - The available 10 DIR-Lab cases have **no clinical tables, no spirometry, no healthy controls, and no exacerbation labels**. They are used exclusively for physical registration evaluation (TRE), parametric response mapping (PRM), and qualitative anomaly visualizations.
 > - CT-RATE labels are **report-derived text proxies**, not spirometry-confirmed COPD. Real-data AUC is reported strictly as a **REPORT-LABEL PROXY**, never as clinical COPD classification.
-> - Exacerbation risk heads, multimodal fusion, and hypothesis tests (likelihood-ratio test, conformal intervals) are evaluated on a **synthetic cohort** with a documented planted effect, with mandatory banners on all outputs.
+> - Exacerbation prediction and multimodal fusion are outside the current imaging paper scope. Synthetic experiments are software tests only and are not scientific evidence.
 
 ---
+
+
+
+## 1.1 Expanded scope: multi-label chest CT findings
+
+In addition to emphysema-oriented quantitative CT analysis, the repository now includes an exploratory **18-label chest CT finding classification head** for CT-RATE. The supported report-derived labels are medical material, arterial wall calcification, cardiomegaly, pericardial effusion, coronary artery wall calcification, hiatal hernia, lymphadenopathy, emphysema, atelectasis, lung nodule, lung opacity, pulmonary fibrotic sequela, pleural effusion, mosaic attenuation pattern, peribronchial thickening, consolidation, bronchiectasis, and interlobular septal thickening.
+
+See the [five-lobe multi-finding research plan](docs/FIVE_LOBE_MULTIFINDING_COPD.md), [multi-label workflow guide](docs/MULTILABEL_CT_FINDINGS.md), and `scripts/train_multilabel_head.py`. The head expects one image-derived embedding vector per CT volume and the matching official CT-RATE label CSV. It does not extract embeddings from raw CT volumes on its own; the image encoder and embedding aggregation pipeline must be run first.
+
+A first weakly supervised spatial baseline is now in `scripts/train_five_lobe_mil.py`. The input bridge `scripts/build_five_lobe_features.py` extracts numeric HU/density features per lobe from CT NIfTI volumes and matching five-lobe masks, producing the long-format table expected by MIL. Example:
+
+```powershell
+python scripts/build_five_lobe_features.py --ct-dir data/ctrate_nifti --lobe-dir data/ctrate_lobes --output-csv outputs/real/reports/ct_lobe_feature_table.csv
+python scripts/train_five_lobe_mil.py --lobe-features-csv outputs/real/reports/ct_lobe_feature_table.csv --labels-csv dataset/multi_abnormality_labels/train_predicted_labels.csv --output-dir outputs/real/five_lobe_mil
+```
+
+Each scan needs exactly five rows (`RUL`, `RML`, `RLL`, `LUL`, `LLL`) and a matching CT-RATE volume name. The extractor validates CT/mask geometry and all five lobe IDs. The MIL model needs at least 30 complete matched scans and 10 patient groups. Its per-lobe outputs are weak localization hypotheses—not radiologist-validated locations.
+
+**Label caveat:** CT-RATE's 18 labels are extracted from radiology reports and are weak labels. Metrics measure agreement with those labels, not confirmed diagnosis. The scan-level head does not localize lesions; the MIL extension emits weak per-lobe hypotheses that are not radiologist-validated. Neither model is clinically validated.
 
 ## 2. Repository Layout
 
@@ -85,7 +104,7 @@ copd-anomaly/
 
 ```powershell
 # 1. Clone repository and navigate to workspace
-git clone https://github.com/placeholder/copd-anomaly.git
+git clone https://github.com/Sirisanjana-jpg/copd-anomaly.git
 cd copd-anomaly
 
 # 2. Set up virtual environment and install dependencies
@@ -122,10 +141,14 @@ python scripts/compute_prm.py
 python scripts/lobe_analysis.py
 ```
 
-### 3.3 Heavy Compute: Kaggle & Colab Workflows
+### 3.3 CT-RATE Streaming & GPU Training
 
-- **Phase A (CPU Streaming & Sharding)**: Open [`notebooks/kaggle_phaseA_cpu_stream.ipynb`](file:///c:/Users/siris/copd-anomaly/notebooks/kaggle_phaseA_cpu_stream.ipynb) with CPU accelerator. Streams single volumes from CT-RATE, resamples to isotropic 1.0mm, extracts $50^3$ patches, writes uint8 shards, **deletes volume**, and uploads shards to your private dataset.
-- **Phase B (GPU Training)**: Open [`notebooks/kaggle_phaseB_gpu_train.ipynb`](file:///c:/Users/siris/copd-anomaly/notebooks/kaggle_phaseB_gpu_train.ipynb) with GPU accelerator (T4/P100). Loads patch shards, trains the 3D contrastive encoder, fits normal-lung density models, and outputs anomaly checkpoints.
+Cloud execution is supported through the same path-based scripts on **Google Colab or Kaggle**; see [`docs/CLOUD_RUNTIME.md`](docs/CLOUD_RUNTIME.md). The Kaggle real-data smoke checklist is in [`docs/KAGGLE_REAL_DATA_SMOKE.md`](docs/KAGGLE_REAL_DATA_SMOKE.md).
+
+
+Use the repository's resumable streaming CLI to prepare patient-disjoint CT-RATE patch shards, then train on the training split only. See [`docs/REAL_TRAINING_RUNBOOK.md`](docs/REAL_TRAINING_RUNBOOK.md) for the gated-access setup, one-volume smoke run, split outputs, resumable training commands, and current limitations.
+
+The streaming CLI can produce global-only patches with provisional threshold lung masks, or five-lobe patches with the optional TotalSegmentator backend. Real patch/scan/patient anomaly-scoring code is present but has not yet been validated on a real cohort. Follow `docs/PUBLICATION_SCOPE.md` and `docs/REAL_TRAINING_RUNBOOK.md`; successful pretraining alone is not evidence of scientific performance.
 
 ---
 
@@ -138,7 +161,7 @@ python scripts/lobe_analysis.py
 | **M3: DIR-Lab Registration** | Pending | Target: TRE $< 1.5$ mm | Observer noise floor: $\approx 0.65 - 1.06$ mm |
 | **M5: CT-RATE Lean Subset** | Pending | 200 volumes selected | Streamed without local persistence |
 | **M6: 3D Contrastive Encoder**| Pending | Not yet run | NT-Xent on `ctrate_train` |
-| **M7: Proxy Emphysema AUC** | Pending | Baseline %LAA vs Anomaly | Bannered: `REPORT-LABEL PROXY` |
+| **M7: Held-out anomaly evaluation** | Not yet validated | Whole-lung vs five-lobe scores and imaging baselines; report-label proxy is optional secondary analysis only |
 | **M9: 5-Model Ablation (Synthetic)**| Pending | LRT p-value | Validates planted effect |
 
 *All results will be logged in `PROGRESS.md` as milestones are completed.*

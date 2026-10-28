@@ -153,10 +153,10 @@ def test_dirlab_manifest_parquet_if_present():
         pytest.skip("Manifest not generated on disk yet.")
 
     import pandas as pd
+
     df = pd.read_parquet(manifest_path)
     assert len(df) == 20
     assert "hu_offset_verified" in df.columns
     assert df["hu_offset_verified"].all()
     assert set(df["phase"].unique()) == {"insp", "exp"}
     assert df["patient_id"].nunique() == 10
-

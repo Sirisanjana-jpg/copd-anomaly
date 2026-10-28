@@ -1,13 +1,17 @@
 """
-Fit normal-lung density models (GMM or Normalizing Flow) on report-normal patches.
+Fit a normal-lung density model from embeddings of eligible real patch shards.
 
-Enforces normal criteria: report negative for all 7 pulmonary conditions AND %LAA-950 < 0.01.
+Synthetic fitting is permitted only with explicit --dry-run and is written to the
+synthetic output area by default.
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 from pathlib import Path
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -20,6 +24,40 @@ from copd_anomaly.utils.helpers import get_logger, set_seed
 logger = get_logger("fit_density")
 
 
+def _attach_density_file_log(log_path: Path) -> None:
+    resolved_path = str(log_path.resolve())
+    if any(
+        isinstance(handler, logging.FileHandler) and handler.baseFilename == resolved_path
+        for handler in logger.handlers
+    ):
+        return
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
+
+
+def _atomic_torch_save(payload: dict[str, object], destination: Path) -> None:
+    """Write and verify a Torch artifact before atomically publishing it."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        with temporary.open("wb") as handle:
+            torch.save(payload, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        check = torch.load(temporary, map_location="cpu", weights_only=False)
+        if not isinstance(check, dict) or "training_mode" not in check:
+            raise OSError(f"Density checkpoint verification failed for {destination}.")
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def fit_density_estimator(
     shards_dir: Path | None = None,
     encoder_ckpt: Path | None = None,
@@ -29,70 +67,184 @@ def fit_density_estimator(
     dry_run: bool = False,
     seed: int = 42,
 ) -> Path:
+    if n_components < 1:
+        raise ValueError("n_components must be >= 1.")
+    output_parts = {part.lower() for part in output_model_path.parts}
+    if dry_run and "real" in output_parts:
+        raise ValueError(
+            "Synthetic density models cannot be written under a real output directory."
+        )
+    if not dry_run and "synthetic" in output_parts:
+        raise ValueError(
+            "Real density models cannot be written under a synthetic output directory."
+        )
+    if model_type not in {"gmm", "flow"}:
+        raise ValueError("model_type must be 'gmm' or 'flow'.")
+
+    if dry_run:
+        if output_model_path == Path("outputs/checkpoints/density_model.joblib"):
+            output_model_path = Path("outputs/synthetic/checkpoints/density_model.joblib")
+    else:
+        if shards_dir is None:
+            raise ValueError(
+                "Real density fitting requires --shards-dir; use --dry-run for a synthetic smoke test."
+            )
+        manifest = shards_dir / "patch_manifest.parquet"
+        if not manifest.is_file():
+            raise FileNotFoundError(
+                f"Patch manifest not found: {manifest}. Build real patches before fitting density. "
+                "No model was written."
+            )
+        if encoder_ckpt is None or not encoder_ckpt.is_file():
+            raise FileNotFoundError(
+                f"A trained encoder checkpoint is required for real density fitting: {encoder_ckpt}. "
+                "Run real encoder training first; no model was written."
+            )
+        if "synthetic" in encoder_ckpt.parts:
+            raise ValueError(
+                "A synthetic smoke-test checkpoint cannot be used for real density fitting."
+            )
+        if output_model_path == Path("outputs/checkpoints/density_model.joblib"):
+            output_model_path = Path("outputs/real/checkpoints/density_model.joblib")
+
     set_seed(seed)
     output_model_path.parent.mkdir(parents=True, exist_ok=True)
+    _attach_density_file_log(output_model_path.parent / "density_fit.log")
 
-    if dry_run or shards_dir is None or not (shards_dir / "patch_manifest.parquet").exists():
-        logger.info("Generating synthetic normal patch embeddings for dry-run fitting (N=100, D=64)...")
-        # Synthetic Gaussian cluster representing normal lung tissue
+    if dry_run:
+        logger.warning("SYNTHETIC DRY RUN ONLY: fitting density on random embeddings, not CT data.")
         rng = np.random.RandomState(seed)
         z_normal = rng.randn(100, 64).astype(np.float32)
-
     else:
-        logger.info(f"Loading normal patch embeddings from {shards_dir}...")
+        assert shards_dir is not None and encoder_ckpt is not None
         dataset = ShardedPatchDataset(shards_dir, normal_only=True, normal_emphysema_cap=0.01)
+        if len(dataset) == 0:
+            raise ValueError(
+                "No eligible normal patches found. Check report labels and LAA-950 metadata."
+            )
         loader = DataLoader(dataset, batch_size=32, shuffle=False)
-
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        encoder = ResNet3DEncoder(in_channels=1, base_filters=16, embedding_dim=128, projection_dim=64).to(device)
-
-        if encoder_ckpt and encoder_ckpt.exists():
-            ckpt = torch.load(encoder_ckpt, map_location=device)
-            encoder.load_state_dict(ckpt["model_state_dict"])
-            logger.info(f"Loaded pretrained encoder weights from {encoder_ckpt}")
+        try:
+            checkpoint = torch.load(encoder_ckpt, map_location=device, weights_only=False)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Cannot load encoder checkpoint {encoder_ckpt}; it may be truncated or corrupt: {exc}"
+            ) from exc
+        if not isinstance(checkpoint, dict):
+            raise ValueError(f"Encoder checkpoint must contain a dictionary: {encoder_ckpt}")
+        if checkpoint.get("training_mode") != "real_patch_training":
+            raise ValueError(
+                "Refusing an encoder checkpoint without explicit real_patch_training provenance. "
+                "Legacy checkpoints may have been created by synthetic fallback code; retrain from real shards."
+            )
+        if checkpoint.get("epoch_complete", True) is False:
+            raise ValueError(
+                "The supplied encoder checkpoint is a mid-epoch recovery point. "
+                "Resume training to finish the epoch and use encoder_best.pt for density fitting."
+            )
+        if int(checkpoint.get("trained_steps", 0)) < 1:
+            raise ValueError("Encoder checkpoint contains no completed optimizer steps.")
+        if "model_state_dict" not in checkpoint:
+            raise ValueError(
+                f"Invalid encoder checkpoint (missing model_state_dict): {encoder_ckpt}"
+            )
+        input_channels = int(checkpoint.get("in_channels", 1))
+        sample_patch, _ = dataset[0]
+        if int(sample_patch.shape[0]) != input_channels:
+            raise ValueError(
+                f"Encoder expects {input_channels} input channels but patch data has "
+                f"{sample_patch.shape[0]}. Rebuild shards or use the matching encoder."
+            )
+        encoder = ResNet3DEncoder(
+            in_channels=input_channels, base_filters=16, embedding_dim=128, projection_dim=64
+        ).to(device)
+        encoder.load_state_dict(checkpoint["model_state_dict"])
         encoder.eval()
-
         embeddings = []
         with torch.no_grad():
             for patches, _ in loader:
-                patches = patches.to(device)
-                z_emb, _ = encoder(patches)
+                _, z_emb = encoder(patches.to(device, dtype=torch.float32))
                 embeddings.append(z_emb.cpu().numpy())
-
+        if not embeddings:
+            raise ValueError("No embeddings extracted from eligible patches.")
         z_normal = np.concatenate(embeddings, axis=0)
-        logger.info(f"Extracted {len(z_normal)} normal embeddings (dim={z_normal.shape[1]}).")
+        if not np.isfinite(z_normal).all():
+            raise FloatingPointError(
+                "Encoder produced NaN or infinite embeddings; density model not saved."
+            )
+        if z_normal.ndim != 2 or z_normal.shape[0] < max(2, n_components):
+            raise ValueError(
+                f"Need at least max(2, n_components)={max(2, n_components)} embeddings; got {z_normal.shape}."
+            )
+        logger.info("Extracted %d real embeddings (dim=%d).", len(z_normal), z_normal.shape[1])
 
     if model_type == "gmm":
-        density_model = GaussianMixtureDensity(n_components=n_components, covariance_type="diag", random_state=seed)
+        density_model = GaussianMixtureDensity(
+            n_components=n_components, covariance_type="diag", random_state=seed
+        )
         density_model.fit(z_normal)
+        density_model.training_mode = "synthetic_dry_run" if dry_run else "real_patch_training"
+        density_model.fit_metadata.update(
+            {
+                "selection_method": (
+                    "random synthetic embeddings"
+                    if dry_run
+                    else "LAA-950 <= 0.01 pseudo-normal heuristic; not verified healthy controls"
+                ),
+                "shards_dir": str(shards_dir) if shards_dir is not None and not dry_run else None,
+                "encoder_checkpoint": (
+                    str(encoder_ckpt) if encoder_ckpt is not None and not dry_run else None
+                ),
+                "seed": int(seed),
+            }
+        )
         density_model.save(str(output_model_path))
     else:
         density_model = RealNVPFlowDensity(dim=z_normal.shape[1], n_layers=4, epochs=10)
         density_model.fit(z_normal)
-        torch.save({"flow_state": density_model.flow.state_dict(), "dim": z_normal.shape[1]}, output_model_path)
-
-    logger.info(f"Successfully saved fitted {model_type} density model to {output_model_path}")
+        _atomic_torch_save(
+            {
+                "flow_state": density_model.flow.state_dict(),
+                "dim": z_normal.shape[1],
+                "training_mode": "synthetic_dry_run" if dry_run else "real_patch_training",
+            },
+            output_model_path,
+        )
+    logger.info(
+        "Saved %s density model to %s", "synthetic" if dry_run else "real", output_model_path
+    )
     return output_model_path
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fit normal-lung density estimator.")
     parser.add_argument("--shards-dir", type=Path, default=Path("data/processed/patches"))
-    parser.add_argument("--encoder-ckpt", type=Path, default=Path("outputs/checkpoints/encoder_best.pt"))
-    parser.add_argument("--output-model", type=Path, default=Path("outputs/checkpoints/density_model.joblib"))
+    parser.add_argument(
+        "--encoder-ckpt", type=Path, default=Path("outputs/real/checkpoints/encoder_best.pt")
+    )
+    parser.add_argument(
+        "--output-model", type=Path, default=Path("outputs/checkpoints/density_model.joblib")
+    )
     parser.add_argument("--model-type", type=str, default="gmm", choices=["gmm", "flow"])
     parser.add_argument("--components", type=int, default=8)
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
-    fit_density_estimator(
-        shards_dir=args.shards_dir,
-        encoder_ckpt=args.encoder_ckpt,
-        output_model_path=args.output_model,
-        model_type=args.model_type,
-        n_components=args.components,
-        dry_run=args.dry_run,
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Fit on random embeddings; not research output"
     )
+    args = parser.parse_args()
+    try:
+        fit_density_estimator(
+            shards_dir=args.shards_dir,
+            encoder_ckpt=args.encoder_ckpt,
+            output_model_path=args.output_model,
+            model_type=args.model_type,
+            n_components=args.components,
+            dry_run=args.dry_run,
+            seed=args.seed,
+        )
+    except Exception:
+        logger.exception("Density fitting terminated with an error.")
+        raise
 
 
 if __name__ == "__main__":

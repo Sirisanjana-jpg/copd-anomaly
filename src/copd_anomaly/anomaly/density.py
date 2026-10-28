@@ -9,6 +9,8 @@ Implements:
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Literal
 
 import joblib
@@ -36,10 +38,19 @@ class GaussianMixtureDensity(DensityModel):
         self.covariance_type = covariance_type
         self.random_state = random_state
         self.gmm: GaussianMixture | None = None
+        self.training_mode: str | None = None
+        self.fit_metadata: dict[str, object] = {}
 
     def fit(self, z_normal: np.ndarray | torch.Tensor) -> None:
         if isinstance(z_normal, torch.Tensor):
             z_normal = z_normal.detach().cpu().numpy()
+        z_normal = np.asarray(z_normal)
+        if z_normal.ndim != 2 or z_normal.shape[0] < 2 or z_normal.shape[1] < 1:
+            raise ValueError(
+                f"Expected at least two 2D embeddings for density fitting, got {z_normal.shape}."
+            )
+        if not np.isfinite(z_normal).all():
+            raise ValueError("Density fitting embeddings contain NaN or infinite values.")
 
         n_samples, _ = z_normal.shape
         n_comp = min(self.n_components, max(1, n_samples // 5))
@@ -55,6 +66,12 @@ class GaussianMixtureDensity(DensityModel):
             max_iter=150,
         )
         self.gmm.fit(z_normal)
+        self.fit_metadata["fit_sample_count"] = int(n_samples)
+        if not self.gmm.converged_:
+            raise RuntimeError(
+                f"GMM did not converge after {self.gmm.n_iter_} iterations; "
+                "do not use this density model. Review embedding quality and sample count."
+            )
         logger.info("GMM fit converged successfully.")
 
     def log_prob(self, z: np.ndarray | torch.Tensor) -> np.ndarray:
@@ -65,22 +82,38 @@ class GaussianMixtureDensity(DensityModel):
         return self.gmm.score_samples(z)
 
     def save(self, path: str) -> None:
-        joblib.dump(
-            {
-                "gmm": self.gmm,
-                "params": {
-                    "n_components": self.n_components,
-                    "covariance_type": self.covariance_type,
+        if self.gmm is None:
+            raise RuntimeError("Cannot save a GMM density model before fitting.")
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.tmp")
+        try:
+            joblib.dump(
+                {
+                    "gmm": self.gmm,
+                    "params": {
+                        "n_components": self.n_components,
+                        "covariance_type": self.covariance_type,
+                    },
+                    "training_mode": self.training_mode,
+                    "fit_metadata": self.fit_metadata,
                 },
-            },
-            path,
-        )
+                temporary,
+            )
+            check = joblib.load(temporary)
+            if check.get("gmm") is None or not hasattr(check["gmm"], "means_"):
+                raise OSError(f"Density model verification failed for {destination}.")
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     @classmethod
     def load(cls, path: str) -> GaussianMixtureDensity:
         data = joblib.load(path)
         obj = cls(**data["params"])
         obj.gmm = data["gmm"]
+        obj.training_mode = data.get("training_mode")
+        obj.fit_metadata = data.get("fit_metadata", {})
         return obj
 
 
@@ -215,5 +248,3 @@ class PatchAnomalyScorer(AnomalyScorer):
         log_p = self.density_model.log_prob(z)
         scores = -log_p
         return scores.astype(np.float32)
-
-

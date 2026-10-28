@@ -5,8 +5,7 @@ Unit tests for synthetic cohort generation, multimodal fusion, MC uncertainty, a
 from __future__ import annotations
 
 from pathlib import Path
-import numpy as np
-import pytest
+
 import torch
 
 from copd_anomaly.synthetic.cohort_generator import (

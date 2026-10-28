@@ -9,6 +9,7 @@ and continuous point coordinate mapping for landmark TRE benchmarking.
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 import SimpleITK as sitk
 
@@ -61,7 +62,9 @@ def evaluate_tre(
                 "min_tre_mm": float(np.min(final_tre)),
                 "max_tre_mm": float(np.max(final_tre)),
                 "tre_reduction_pct": float(
-                    (np.mean(initial_tre) - np.mean(final_tre)) / (np.mean(initial_tre) + 1e-8) * 100.0
+                    (np.mean(initial_tre) - np.mean(final_tre))
+                    / (np.mean(initial_tre) + 1e-8)
+                    * 100.0
                 ),
             }
         )
@@ -96,12 +99,23 @@ class SimpleITKRegistrar(Registrar):
         self.fast_mode = fast_mode
 
     def _numpy_to_sitk(
-        self, array_zyx: np.ndarray, spacing_zyx: tuple[float, float, float]
+        self,
+        array_zyx: np.ndarray,
+        spacing_zyx: tuple[float, float, float],
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> sitk.Image:
-        """Converts (Z, Y, X) numpy array to SimpleITK Image with spacing (sx, sy, sz)."""
+        """Converts (Z,Y,X) array to SimpleITK while preserving physical geometry."""
         image = sitk.GetImageFromArray(array_zyx)
         sz, sy, sx = spacing_zyx
         image.SetSpacing((float(sx), float(sy), float(sz)))
+        image.SetOrigin(tuple(float(value) for value in origin_xyz))
+        direction = np.asarray(direction_xyz, dtype=float).reshape(3, 3)
+        if not np.allclose(direction.T @ direction, np.eye(3), atol=1e-4):
+            raise ValueError(
+                "Image direction must be orthonormal; reorient/resample CT geometry first."
+            )
+        image.SetDirection(tuple(direction.ravel()))
         return image
 
     def register(
@@ -111,31 +125,35 @@ class SimpleITKRegistrar(Registrar):
         fixed_mask: np.ndarray | None = None,
         moving_mask: np.ndarray | None = None,
         spacing_zyx: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> RegistrationResult:
         """
-        Registers moving (exhale) volume to fixed (inhale) volume.
+        Registers moving (exhale) volume to fixed (inhale) volume in physical image space.
         """
-        fixed_img = self._numpy_to_sitk(fixed_volume, spacing_zyx)
-        moving_img = self._numpy_to_sitk(moving_volume, spacing_zyx)
+        fixed_img = self._numpy_to_sitk(fixed_volume, spacing_zyx, origin_xyz, direction_xyz)
+        moving_img = self._numpy_to_sitk(moving_volume, spacing_zyx, origin_xyz, direction_xyz)
 
-        # Resample moving image to match fixed geometry if shapes differ
+        # Do not silently resample an unregistered grid: that would invalidate landmark
+        # correspondence and the interpretation of the fitted transform.
         if fixed_volume.shape != moving_volume.shape:
-            logger.info("Resampling moving image grid to match fixed image shape...")
-            moving_img = sitk.Resample(
-                moving_img,
-                fixed_img,
-                sitk.Transform(),
-                sitk.sitkLinear,
-                -1024.0,
-                moving_img.GetPixelID(),
+            raise ValueError(
+                f"Registration requires matching array shapes, got fixed={fixed_volume.shape}, "
+                f"moving={moving_volume.shape}. Harmonize both images and landmarks explicitly first."
             )
+        if fixed_mask is not None and fixed_mask.shape != fixed_volume.shape:
+            raise ValueError("Fixed lung mask shape does not match the fixed CT volume.")
+        if moving_mask is not None and moving_mask.shape != moving_volume.shape:
+            raise ValueError("Moving lung mask shape does not match the moving CT volume.")
 
         # Set up registration method
         R = sitk.ImageRegistrationMethod()
         R.SetMetricAsMeanSquares()
 
         if fixed_mask is not None and np.any(fixed_mask):
-            fixed_mask_img = self._numpy_to_sitk(fixed_mask.astype(np.uint8), spacing_zyx)
+            fixed_mask_img = self._numpy_to_sitk(
+                fixed_mask.astype(np.uint8), spacing_zyx, origin_xyz, direction_xyz
+            )
             R.SetMetricFixedMask(fixed_mask_img)
 
         R.SetMetricSamplingStrategy(R.RANDOM)
@@ -200,27 +218,37 @@ class SimpleITKRegistrar(Registrar):
         points: np.ndarray,
         transform: Any,
         spacing_zyx: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        direction_xyz: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
     ) -> np.ndarray:
         """
-        Transforms moving landmark coordinates (x, y, z) into the fixed coordinate space.
+        Applies the fitted output-to-input transform: fixed/output coordinates to moving/input space.
+
+        SimpleITK registration returns the transform used by Resample. When registering
+        expiration (moving/input) to inspiration (fixed/output), this transform maps inhale
+        landmark coordinates into exhale space; compare those transformed points with expert
+        exhale landmarks for TRE.
 
         Args:
-            points: (N, 3) float32 coordinates as (x, y, z) in voxel space.
-            transform: Fitted SimpleITK transform.
+            points: (N, 3) float32 coordinates as (x, y, z) in voxel-index space.
+            transform: Fitted SimpleITK output-to-input transform.
             spacing_zyx: (sz, sy, sx) in mm.
 
         Returns:
-            warped_points: (N, 3) float32 coordinates in fixed voxel space.
+            Transformed coordinates in moving/input voxel-index space.
         """
         sz, sy, sx = spacing_zyx
         spacing_xyz = np.array([sx, sy, sz], dtype=np.float64)
+        origin = np.asarray(origin_xyz, dtype=np.float64)
+        direction = np.asarray(direction_xyz, dtype=np.float64).reshape(3, 3)
+        if not np.allclose(direction.T @ direction, np.eye(3), atol=1e-4):
+            raise ValueError("Image direction must be orthonormal for landmark transformation.")
 
         transformed = np.zeros_like(points, dtype=np.float32)
         for i in range(len(points)):
-            pt_voxel = points[i]
-            pt_phys = tuple(pt_voxel * spacing_xyz)
-            warped_phys = transform.TransformPoint(pt_phys)
-            warped_voxel = np.array(warped_phys, dtype=np.float64) / spacing_xyz
+            pt_phys = origin + direction @ (np.asarray(points[i], dtype=np.float64) * spacing_xyz)
+            warped_phys = np.asarray(transform.TransformPoint(tuple(pt_phys)), dtype=np.float64)
+            warped_voxel = (direction.T @ (warped_phys - origin)) / spacing_xyz
             transformed[i] = warped_voxel.astype(np.float32)
 
         return transformed

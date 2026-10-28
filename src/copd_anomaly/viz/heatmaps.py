@@ -5,6 +5,7 @@ Volumetric Anomaly Heatmap Reconstruction and Slice Visualization.
 from __future__ import annotations
 
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
 
@@ -32,7 +33,7 @@ def reconstruct_anomaly_volume(
     accum_vol = np.zeros(shape_zyx, dtype=np.float32)
     count_vol = np.zeros(shape_zyx, dtype=np.float32)
 
-    for rec, score in zip(records, patch_scores):
+    for rec, score in zip(records, patch_scores, strict=True):
         cz, cy, cx = rec.center_zyx
         z0, z1 = max(0, cz - half_p), min(z_dim, cz + half_p)
         y0, y1 = max(0, cy - half_p), min(y_dim, cy + half_p)

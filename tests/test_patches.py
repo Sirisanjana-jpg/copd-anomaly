@@ -6,8 +6,8 @@ Uses small synthetic volumetric phantoms.
 from __future__ import annotations
 
 from pathlib import Path
+
 import numpy as np
-import pytest
 import torch
 
 from copd_anomaly.patches.dataset import ShardedPatchDataset, ShardedPatchWriter

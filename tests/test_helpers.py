@@ -46,4 +46,3 @@ def test_get_logger():
     logger = get_logger("test_logger")
     assert logger.name == "test_logger"
     assert len(logger.handlers) >= 1
-

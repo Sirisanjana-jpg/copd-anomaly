@@ -25,9 +25,7 @@ class BasicBlock3D(nn.Module):
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
         )
         self.bn1 = nn.BatchNorm3d(planes)
-        self.conv2 = nn.Conv3d(
-            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
-        )
+        self.conv2 = nn.Conv3d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm3d(planes)
 
         self.shortcut = nn.Sequential()
@@ -63,9 +61,7 @@ class ResNet3DEncoder(BaseEncoder):
 
         # Initial 3D Conv
         self.init_conv = nn.Sequential(
-            nn.Conv3d(
-                in_channels, base_filters, kernel_size=3, stride=1, padding=1, bias=False
-            ),
+            nn.Conv3d(in_channels, base_filters, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm3d(base_filters),
             nn.ReLU(inplace=True),
         )
@@ -73,9 +69,7 @@ class ResNet3DEncoder(BaseEncoder):
         # 3 Stages of residual blocks downsampling spatial resolution: 50 -> 25 -> 13 -> 7
         self.layer1 = self._make_layer(base_filters, base_filters, num_blocks=2, stride=2)
         self.layer2 = self._make_layer(base_filters, base_filters * 2, num_blocks=2, stride=2)
-        self.layer3 = self._make_layer(
-            base_filters * 2, base_filters * 4, num_blocks=2, stride=2
-        )
+        self.layer3 = self._make_layer(base_filters * 2, base_filters * 4, num_blocks=2, stride=2)
 
         # Global average pooling
         self.global_pool = nn.AdaptiveAvgPool3d((1, 1, 1))

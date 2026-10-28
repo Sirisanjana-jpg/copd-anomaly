@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -60,22 +61,56 @@ def register_pairs(
         logger.info(f"=== Registering {case_id} (fast_mode={fast_mode}) ===")
         img_insp = nib.load(str(insp_path))
         img_exp = nib.load(str(exp_path))
+        if not np.allclose(img_insp.affine, img_exp.affine, rtol=0.0, atol=1e-4):
+            raise ValueError(
+                f"Geometry mismatch for {case_id}: inhale/exhale affines differ. "
+                "This registrar assumes matching orientation, origin and voxel spacing; "
+                "normalize geometry before registration."
+            )
 
-        vol_insp = np.transpose(img_insp.get_fdata().astype(np.float32), (2, 1, 0))
-        vol_exp = np.transpose(img_exp.get_fdata().astype(np.float32), (2, 1, 0))
+        vol_insp = np.transpose(img_insp.get_fdata(dtype=np.float32), (2, 1, 0))
+        vol_exp = np.transpose(img_exp.get_fdata(dtype=np.float32), (2, 1, 0))
         zooms_xyz = img_insp.header.get_zooms()[:3]
+        exp_zooms_xyz = img_exp.header.get_zooms()[:3]
+        if not np.allclose(zooms_xyz, exp_zooms_xyz, rtol=0.0, atol=1e-4):
+            raise ValueError(
+                f"Voxel spacing mismatch for {case_id}: {zooms_xyz} vs {exp_zooms_xyz}."
+            )
         spacing_zyx = (float(zooms_xyz[2]), float(zooms_xyz[1]), float(zooms_xyz[0]))
+        affine_linear = np.asarray(img_insp.affine[:3, :3], dtype=np.float64)
+        direction_matrix = affine_linear / np.asarray(zooms_xyz, dtype=np.float64)[None, :]
+        if not np.allclose(direction_matrix.T @ direction_matrix, np.eye(3), atol=1e-4):
+            raise ValueError(
+                f"Non-orthonormal NIfTI direction for {case_id}; explicitly reorient/resample "
+                "the CTs and landmarks before registration."
+            )
+        origin_xyz = tuple(float(v) for v in img_insp.affine[:3, 3])
+        direction_xyz = tuple(float(v) for v in direction_matrix.ravel())
 
         # Load or generate masks
         insp_mask_path = masks_dir / f"{case_id}_insp_mask.nii.gz"
         if insp_mask_path.exists():
-            mask_insp = np.transpose(nib.load(str(insp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0))
+            mask_img = nib.load(str(insp_mask_path))
+            if mask_img.shape != img_insp.shape or not np.allclose(
+                mask_img.affine, img_insp.affine, rtol=0.0, atol=1e-4
+            ):
+                raise ValueError(f"Inhale mask geometry does not match CT for {case_id}.")
+            mask_insp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(
+                np.uint8
+            )
         else:
             mask_insp = segmenter.segment(vol_insp, spacing_zyx)
 
         exp_mask_path = masks_dir / f"{case_id}_exp_mask.nii.gz"
         if exp_mask_path.exists():
-            mask_exp = np.transpose(nib.load(str(exp_mask_path)).get_fdata().astype(np.uint8), (2, 1, 0))
+            mask_img = nib.load(str(exp_mask_path))
+            if mask_img.shape != img_exp.shape or not np.allclose(
+                mask_img.affine, img_exp.affine, rtol=0.0, atol=1e-4
+            ):
+                raise ValueError(f"Exhale mask geometry does not match CT for {case_id}.")
+            mask_exp = np.transpose(mask_img.get_fdata(dtype=np.float32), (2, 1, 0)).astype(
+                np.uint8
+            )
         else:
             mask_exp = segmenter.segment(vol_exp, spacing_zyx)
 
@@ -86,6 +121,8 @@ def register_pairs(
             fixed_mask=mask_insp,
             moving_mask=mask_exp,
             spacing_zyx=spacing_zyx,
+            origin_xyz=origin_xyz,
+            direction_xyz=direction_xyz,
         )
 
         # Save warped volume
@@ -104,8 +141,17 @@ def register_pairs(
             pts_insp, _, _ = loader.load_landmarks(insp_lm_file[0], vol_insp.shape, mask_insp)
             pts_exp, _, _ = loader.load_landmarks(exp_lm_file[0], vol_exp.shape, mask_exp)
 
-            pts_exp_warped = registrar.transform_points(pts_exp, reg_result.transform, spacing_zyx)
-            tre_stats = evaluate_tre(pts_insp, pts_exp, pts_exp_warped, spacing_zyx)
+            # SimpleITK's resampling transform maps output/fixed (inspiration) points
+            # into input/moving (expiration) space. Transform inhale landmarks, then
+            # compare them with the expert exhale landmarks in that same coordinate space.
+            pts_insp_warped_to_exp = registrar.transform_points(
+                pts_insp,
+                reg_result.transform,
+                spacing_zyx,
+                origin_xyz=origin_xyz,
+                direction_xyz=direction_xyz,
+            )
+            tre_stats = evaluate_tre(pts_exp, pts_insp, pts_insp_warped_to_exp, spacing_zyx)
             tre_stats["case_id"] = case_id
             tre_records.append(tre_stats)
             logger.info(
@@ -115,7 +161,9 @@ def register_pairs(
             )
 
         # PRM computation
-        prm_stats = compute_prm_stats(vol_insp, reg_result.warped_volume, mask_insp, spacing_zyx=spacing_zyx)
+        prm_stats = compute_prm_stats(
+            vol_insp, reg_result.warped_volume, mask_insp, spacing_zyx=spacing_zyx
+        )
         prm_stats["case_id"] = case_id
         prm_records.append(prm_stats)
         logger.info(
@@ -146,7 +194,9 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/registered"))
     parser.add_argument("--reports-dir", type=Path, default=Path("reports"))
     parser.add_argument("--config", type=Path, default=Path("configs/data/dirlab_cases.yaml"))
-    parser.add_argument("--fast-mode", action="store_true", help="Run with minimal iterations for testing.")
+    parser.add_argument(
+        "--fast-mode", action="store_true", help="Run with minimal iterations for testing."
+    )
     parser.add_argument("--cases", nargs="*", default=None, help="Filter cases.")
     args = parser.parse_args()
 

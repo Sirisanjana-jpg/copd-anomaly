@@ -18,7 +18,6 @@ import nibabel as nib
 import numpy as np
 import yaml
 
-from copd_anomaly.interfaces import ScanMetadata
 from copd_anomaly.utils.helpers import get_logger
 
 logger = get_logger("dirlab_loader")
@@ -29,7 +28,7 @@ class DIRLabLoader:
 
     def __init__(self, config_path: str | Path = "configs/data/dirlab_cases.yaml") -> None:
         self.config_path = Path(config_path)
-        with open(self.config_path, "r", encoding="utf-8") as f:
+        with open(self.config_path, encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.defaults = self.config.get("defaults", {})
@@ -138,7 +137,9 @@ class DIRLabLoader:
         """Loads 300 landmarks and decides whether indexing is 0-based or 1-based."""
         data = np.loadtxt(landmarks_path, dtype=np.float32)
         if data.shape[1] != 3:
-            raise ValueError(f"Expected (N, 3) landmarks in {landmarks_path}, got shape {data.shape}")
+            raise ValueError(
+                f"Expected (N, 3) landmarks in {landmarks_path}, got shape {data.shape}"
+            )
 
         z_max, y_max, x_max = shape_zyx
 
@@ -197,4 +198,3 @@ class DIRLabLoader:
         img.header.set_xyzt_units("mm")
         nib.save(img, str(output_path))
         logger.info(f"Saved NIfTI volume to {output_path}")
-

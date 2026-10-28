@@ -11,6 +11,7 @@ Real COPD classification requires spirometry (FEV1/FVC < 0.70).
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve
 
