@@ -84,7 +84,6 @@ def load_ctrate_hu(
     hu_img.set_qform(source_img.get_qform(), code=int(source_img.header["qform_code"]))
 
     canonical_img = nib.as_closest_canonical(hu_img)
-    canonical_hu = canonical_img.get_fdata(dtype=np.float32)
 
     valid_img = nib.Nifti1Image(
         valid_source.astype(np.uint8),
@@ -381,15 +380,16 @@ class CTRATEStreamer:
                 int(np.count_nonzero(lung_mask)),
             )
             stage = "patch_extraction"
-            patches, records = self.sampler.extract_patches(
-                volume_insp=vol_zyx,
-                volume_exp=None,
-                lung_mask=lung_mask,
-                lobe_mask=mask if self.use_lobe_segmentation else None,
-                max_patches_per_scan=self.max_patches_per_scan,
-                patient_id=patient_id,
-                scan_id=volume_name.split(".")[0],
-            )
+           patches, records = self.sampler.extract_patches(
+    volume_insp=vol_zyx,
+    volume_exp=None,
+    lung_mask=lung_mask,
+    lobe_mask=mask if self.use_lobe_segmentation else None,
+    valid_mask=valid_zyx,
+    max_patches_per_scan=self.max_patches_per_scan,
+    patient_id=patient_id,
+    scan_id=volume_name.removesuffix(".nii.gz"),
+)
 
             if len(records) == 0:
                 logger.warning(
